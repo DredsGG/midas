@@ -40,9 +40,9 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 
 ## Install
 
-1. Download or clone this repo.
+1. Download **midas-vX.Y.Z.zip** from the [latest release](https://github.com/DredsGG/midas/releases/latest).
 2. Open `chrome://extensions` and turn on **Developer mode**.
-3. Click **Load unpacked** and pick the `extension/` folder.
+3. Drag the zip onto the page (or unzip it and use **Load unpacked**). From a clone of this repo, load the `extension/` folder.
 4. Open (or reload) duolingo.com.
 
 Keep Duolingo in its **own visible window** while grinding: Chrome throttles timers in background tabs and the grind slows down a lot.
