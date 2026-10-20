@@ -1,0 +1,214 @@
+// Midas — traduções (v0.9). Idioma = o do navegador (navigator.languages),
+// com inglês como reserva. Roda no mundo MAIN (antes de main.js/hud.js) e no popup.
+// chrome.i18n não existe no mundo MAIN, por isso o dicionário próprio.
+(() => {
+  'use strict';
+  const KEY = Symbol.for('alp.i18n');
+  if (typeof window !== 'undefined' && window[KEY]) return;
+
+  const DICT = {
+    pt: {
+      'stale.msg': 'O Midas foi atualizado. Recarregue esta aba para usar a versão nova.', 'stale.btn': 'Recarregar',
+      'theme.toLight': 'Mudar para modo claro', 'theme.toDark': 'Mudar para modo escuro',
+      'credit.by': 'feito por',
+      'chip.stopped': 'parado', 'chip.running': 'rodando', 'chip.lesson': 'lição',
+      'fab.title': 'Midas (Alt+H)', 'close.title': 'Recolher (Alt+H)',
+      'grind.title': 'Auto Grind', 'grind.sub': 'lições + Titãs em todo o caminho',
+      'btn.start': 'Iniciar', 'btn.stop': 'Parar',
+      'stat.legendary': 'titãs', 'stat.left': 'faltam', 'stat.eta': 'estimativa',
+      'now.next': 'Próximo:', 'mode.lesson': 'Lição', 'mode.legendary': 'Titãs',
+      'now.where': 'unidade {u}, nó {n}', 'now.reading': 'Lendo o caminho…', 'now.none': 'Caminho completo ou ainda não lido.',
+      'type.skill': 'lição', 'type.story': 'história', 'type.practice': 'prática', 'type.unit_review': 'revisão', 'type.chest': 'baú', 'type.duo_radio': 'rádio',
+      'note.blocked': '{n} práticas de revisão espaçada não aceitam Titãs no site do Duolingo',
+      'note.skipped': '{n} nós pulados nesta rodada (ver log)',
+      'lesson.title': 'Lição atual', 'act.solveNext': 'Resolver e seguir', 'act.solve': 'Só resolver', 'act.lesson': 'Lição inteira', 'act.skip': 'Pular',
+      'speed.title': 'Velocidade',
+      'preset.rage': '0 ms, sem humanização: o mais rápido possível.',
+      'preset.legit': '2,5 s com variação humana entre ações. Recomendado: ritmo parecido com o de uma pessoa.',
+      'preset.manual': 'Seu próprio ajuste: escolha o atraso e a humanização.',
+      'set.delay': 'Atraso', 'set.humanize': 'Tempo humanizado',
+      'log.title': 'Log', 'log.copy': 'Copiar', 'log.copied': 'Copiado!', 'log.failed': 'Falhou', 'log.copyTitle': 'Copiar o log inteiro', 'log.empty': 'sem eventos ainda',
+      'unk': 'Tipos novos (solver genérico): {list}',
+      'key.solve': 'resolver', 'key.grind': 'auto grind', 'key.stop': 'parar', 'key.hud': 'HUD',
+      'help.label': 'O que é isto?',
+      'help.grind': 'Faz o caminho inteiro sozinho: cada lição que falta e, logo depois, a Titãs (nível lendário) do mesmo nó. Antes de abrir lição nova, refaz as Titãs que ficaram para trás. Pode deixar rodando; se a página recarregar, ele continua de onde parou.',
+      'help.stats': 'Titãs: nós já dourados. Faltam: nós que aceitam Titãs e ainda não estão dourados (inclui os travados). Estimativa: tempo aproximado no ritmo desta rodada.',
+      'help.lesson': 'Para usar com uma lição aberta. Resolver e seguir: responde e avança. Só resolver: só marca a resposta. Lição inteira: termina a lição sozinho. Pular: pula o exercício (a Titãs não tem essa opção).',
+      'help.speed': 'Rage: o mais rápido possível. Legit: pausas variadas, num ritmo parecido com o de uma pessoa (recomendado). Manual: você escolhe o atraso e a humanização.',
+      'help.delay': 'Tempo base entre as ações: marcar a resposta, tocar cada palavra, avançar. Mexer aqui muda para Manual.',
+      'help.humanize': 'Varia cada pausa aleatoriamente em torno do atraso, para o ritmo não ficar robótico.',
+      'help.log': 'Histórico do que a extensão fez. "Copiar" põe o log inteiro na área de transferência — cole na conversa para reportar um erro.',
+      'log.tokenNotFound': 'token não encontrado: "{t}"', 'log.pairUnsolved': 'par não resolvido: {a} / {b}',
+      'log.radioNewType': 'rádio: tipo novo {type} (usando solver genérico)', 'log.newType': 'tipo novo: {type} (usando solver genérico)',
+      'log.solverError': 'erro no solver: {e}', 'log.lessonTimeout': 'timeout da lição',
+      'log.stuckSkip': 'travado no exercício ({type}), pulando',
+      'log.stuckAbandon': 'exercício {type} sem solução e sem botão Pular — abandonando a lição',
+      'log.noNext': 'sem botão para avançar (status {status})',
+      'log.storyToken': 'história: token "{t}" não encontrado', 'log.storyTimeout': 'timeout da história',
+      'log.storySolver': 'história: erro no solver: {e}', 'log.storyNewType': 'história: tipo novo {type}', 'log.storyStuck': 'história travada',
+      'log.sectionNotFound': 'seção {n} não encontrada na tela de seções',
+      'log.sectionNotLoaded': 'seção {n} não carregou (unidades na tela: {units})',
+      'log.grindStart': 'grind iniciado', 'log.pathFail': 'falha ao ler o caminho: {e}',
+      'log.blocked': 'parado: o próximo nó do caminho não abriu. Recarregue a página e clique Iniciar de novo.',
+      'log.complete': 'nada mais para fazer: caminho 100% dourado',
+      'log.target': '{mode} → unidade {u}, nó {n} ({type}: {name})',
+      'log.openFail': 'não consegui abrir o nó ativo (tentativa {n})',
+      'log.refused': 'o Duolingo recusou a Titãs deste nó (erro {status}); acontece até no clique manual',
+      'log.notAdvanced': 'nó não avançou ({r}), tentativa {n}', 'log.skipNode': 'pulando este nó por enquanto',
+      'log.lessonResult': 'lição: {r}', 'log.grindStopped': 'grind parado', 'log.grindResult': 'grind: {r}',
+      'log.stopped': 'parado', 'log.cmdFail': 'comando {cmd} falhou: {e}',
+      'pop.running.grind': 'auto grind rodando…', 'pop.running.lesson': 'resolvendo lição…',
+      'pop.openDuo': 'abra o duolingo.com', 'pop.reload': 'recarregue a aba do Duolingo', 'pop.complete': 'Caminho completo.',
+      'pop.footer1': 'A HUD completa fica dentro do Duolingo (coroa no canto · Alt+H).',
+      'pop.footer2': 'Ctrl+Enter resolver e seguir · Alt+Enter resolver · Alt+S pular · Alt+L lição · Alt+G auto grind · Alt+X parar',
+    },
+    en: {
+      'stale.msg': 'Midas was updated. Reload this tab to use the new version.', 'stale.btn': 'Reload',
+      'theme.toLight': 'Switch to light mode', 'theme.toDark': 'Switch to dark mode',
+      'credit.by': 'made by',
+      'chip.stopped': 'stopped', 'chip.running': 'running', 'chip.lesson': 'lesson',
+      'fab.title': 'Midas (Alt+H)', 'close.title': 'Collapse (Alt+H)',
+      'grind.title': 'Auto Grind', 'grind.sub': 'lessons + Legendary across the whole path',
+      'btn.start': 'Start', 'btn.stop': 'Stop',
+      'stat.legendary': 'legendary', 'stat.left': 'left', 'stat.eta': 'estimate',
+      'now.next': 'Next:', 'mode.lesson': 'Lesson', 'mode.legendary': 'Legendary',
+      'now.where': 'unit {u}, node {n}', 'now.reading': 'Reading the path…', 'now.none': 'Path complete or not read yet.',
+      'type.skill': 'lesson', 'type.story': 'story', 'type.practice': 'practice', 'type.unit_review': 'review', 'type.chest': 'chest', 'type.duo_radio': 'radio',
+      'note.blocked': '{n} spaced-repetition practices don’t accept Legendary on the Duolingo website',
+      'note.skipped': '{n} nodes skipped this run (see log)',
+      'lesson.title': 'Current lesson', 'act.solveNext': 'Solve & continue', 'act.solve': 'Solve only', 'act.lesson': 'Whole lesson', 'act.skip': 'Skip',
+      'speed.title': 'Speed',
+      'preset.rage': '0 ms, no humanizing: as fast as possible.',
+      'preset.legit': '2.5 s with human-like variation between actions. Recommended: a pace similar to a real person.',
+      'preset.manual': 'Your own setting: pick the delay and humanizing.',
+      'set.delay': 'Delay', 'set.humanize': 'Humanized timing',
+      'log.title': 'Log', 'log.copy': 'Copy', 'log.copied': 'Copied!', 'log.failed': 'Failed', 'log.copyTitle': 'Copy the whole log', 'log.empty': 'no events yet',
+      'unk': 'New types (generic solver): {list}',
+      'key.solve': 'solve', 'key.grind': 'auto grind', 'key.stop': 'stop', 'key.hud': 'HUD',
+      'help.label': 'What is this?',
+      'help.grind': 'Plays the whole path for you: every unfinished lesson, followed right away by the Legendary level of the same node. Before opening a new lesson it redoes any Legendary left behind. You can leave it running; if the page reloads, it picks up where it stopped.',
+      'help.stats': 'Legendary: nodes already gold. Left: nodes that accept Legendary and aren’t gold yet (locked ones included). Estimate: rough time at this run’s pace.',
+      'help.lesson': 'Use with a lesson open. Solve & continue: answers and moves on. Solve only: just fills in the answer. Whole lesson: finishes the lesson by itself. Skip: skips the exercise (Legendary has no skip).',
+      'help.speed': 'Rage: as fast as possible. Legit: varied pauses at a human-like pace (recommended). Manual: you choose the delay and humanizing.',
+      'help.delay': 'Base time between actions: filling the answer, tapping each word, moving on. Changing it switches to Manual.',
+      'help.humanize': 'Randomly varies each pause around the delay so the rhythm isn’t robotic.',
+      'help.log': 'History of what the extension did. "Copy" puts the whole log on your clipboard — paste it to report a problem.',
+      'log.tokenNotFound': 'token not found: "{t}"', 'log.pairUnsolved': 'pair not solved: {a} / {b}',
+      'log.radioNewType': 'radio: new type {type} (using generic solver)', 'log.newType': 'new type: {type} (using generic solver)',
+      'log.solverError': 'solver error: {e}', 'log.lessonTimeout': 'lesson timed out',
+      'log.stuckSkip': 'stuck on exercise ({type}), skipping',
+      'log.stuckAbandon': 'exercise {type} unsolved and no Skip button — leaving the lesson',
+      'log.noNext': 'no button to continue (status {status})',
+      'log.storyToken': 'story: token "{t}" not found', 'log.storyTimeout': 'story timed out',
+      'log.storySolver': 'story: solver error: {e}', 'log.storyNewType': 'story: new type {type}', 'log.storyStuck': 'story stuck',
+      'log.sectionNotFound': 'section {n} not found on the sections screen',
+      'log.sectionNotLoaded': 'section {n} did not load (units on screen: {units})',
+      'log.grindStart': 'grind started', 'log.pathFail': 'could not read the path: {e}',
+      'log.blocked': 'stopped: the next node on the path didn’t open. Reload the page and press Start again.',
+      'log.complete': 'nothing left to do: path 100% gold',
+      'log.target': '{mode} → unit {u}, node {n} ({type}: {name})',
+      'log.openFail': 'could not open the active node (attempt {n})',
+      'log.refused': 'Duolingo refused Legendary for this node (error {status}); it happens even when clicking by hand',
+      'log.notAdvanced': 'node did not advance ({r}), attempt {n}', 'log.skipNode': 'skipping this node for now',
+      'log.lessonResult': 'lesson: {r}', 'log.grindStopped': 'grind stopped', 'log.grindResult': 'grind: {r}',
+      'log.stopped': 'stopped', 'log.cmdFail': 'command {cmd} failed: {e}',
+      'pop.running.grind': 'auto grind running…', 'pop.running.lesson': 'solving lesson…',
+      'pop.openDuo': 'open duolingo.com', 'pop.reload': 'reload the Duolingo tab', 'pop.complete': 'Path complete.',
+      'pop.footer1': 'The full HUD lives inside Duolingo (crown in the corner · Alt+H).',
+      'pop.footer2': 'Ctrl+Enter solve & continue · Alt+Enter solve · Alt+S skip · Alt+L lesson · Alt+G auto grind · Alt+X stop',
+    },
+    es: {
+      'stale.msg': 'Midas se actualizó. Recarga esta pestaña para usar la versión nueva.', 'stale.btn': 'Recargar',
+      'theme.toLight': 'Cambiar a modo claro', 'theme.toDark': 'Cambiar a modo oscuro',
+      'credit.by': 'hecho por',
+      'chip.stopped': 'detenido', 'chip.running': 'en marcha', 'chip.lesson': 'lección',
+      'fab.title': 'Midas (Alt+H)', 'close.title': 'Contraer (Alt+H)',
+      'grind.title': 'Auto Grind', 'grind.sub': 'lecciones + Legendario en todo el camino',
+      'btn.start': 'Iniciar', 'btn.stop': 'Detener',
+      'stat.legendary': 'legendario', 'stat.left': 'faltan', 'stat.eta': 'estimación',
+      'now.next': 'Siguiente:', 'mode.lesson': 'Lección', 'mode.legendary': 'Legendario',
+      'now.where': 'unidad {u}, nodo {n}', 'now.reading': 'Leyendo el camino…', 'now.none': 'Camino completo o aún sin leer.',
+      'type.skill': 'lección', 'type.story': 'historia', 'type.practice': 'práctica', 'type.unit_review': 'repaso', 'type.chest': 'cofre', 'type.duo_radio': 'radio',
+      'note.blocked': '{n} prácticas de repetición espaciada no aceptan Legendario en la web de Duolingo',
+      'note.skipped': '{n} nodos saltados en esta ronda (ver registro)',
+      'lesson.title': 'Lección actual', 'act.solveNext': 'Resolver y seguir', 'act.solve': 'Solo resolver', 'act.lesson': 'Lección completa', 'act.skip': 'Saltar',
+      'speed.title': 'Velocidad',
+      'preset.rage': '0 ms, sin humanizar: lo más rápido posible.',
+      'preset.legit': '2,5 s con variación humana entre acciones. Recomendado: ritmo parecido al de una persona.',
+      'preset.manual': 'Tu propio ajuste: elige el retraso y la humanización.',
+      'set.delay': 'Retraso', 'set.humanize': 'Tiempo humanizado',
+      'log.title': 'Registro', 'log.copy': 'Copiar', 'log.copied': '¡Copiado!', 'log.failed': 'Error', 'log.copyTitle': 'Copiar todo el registro', 'log.empty': 'sin eventos todavía',
+      'unk': 'Tipos nuevos (solver genérico): {list}',
+      'key.solve': 'resolver', 'key.grind': 'auto grind', 'key.stop': 'detener', 'key.hud': 'HUD',
+      'help.label': '¿Qué es esto?',
+      'help.grind': 'Hace todo el camino por ti: cada lección pendiente y, justo después, el nivel Legendario del mismo nodo. Antes de abrir una lección nueva rehace los Legendarios que quedaron atrás. Puedes dejarlo en marcha; si la página se recarga, sigue donde se quedó.',
+      'help.stats': 'Legendario: nodos ya dorados. Faltan: nodos que aceptan Legendario y aún no están dorados (incluye los bloqueados). Estimación: tiempo aproximado al ritmo de esta ronda.',
+      'help.lesson': 'Para usar con una lección abierta. Resolver y seguir: responde y avanza. Solo resolver: solo marca la respuesta. Lección completa: termina la lección solo. Saltar: salta el ejercicio (Legendario no lo permite).',
+      'help.speed': 'Rage: lo más rápido posible. Legit: pausas variadas a un ritmo humano (recomendado). Manual: tú eliges el retraso y la humanización.',
+      'help.delay': 'Tiempo base entre acciones: marcar la respuesta, tocar cada palabra, avanzar. Cambiarlo pasa a Manual.',
+      'help.humanize': 'Varía cada pausa al azar alrededor del retraso para que el ritmo no sea robótico.',
+      'help.log': 'Historial de lo que hizo la extensión. "Copiar" pone todo el registro en el portapapeles: pégalo para reportar un error.',
+      'log.tokenNotFound': 'token no encontrado: "{t}"', 'log.pairUnsolved': 'par no resuelto: {a} / {b}',
+      'log.radioNewType': 'radio: tipo nuevo {type} (solver genérico)', 'log.newType': 'tipo nuevo: {type} (solver genérico)',
+      'log.solverError': 'error del solver: {e}', 'log.lessonTimeout': 'tiempo agotado en la lección',
+      'log.stuckSkip': 'atascado en el ejercicio ({type}), saltando',
+      'log.stuckAbandon': 'ejercicio {type} sin resolver y sin botón Saltar: abandonando la lección',
+      'log.noNext': 'sin botón para avanzar (estado {status})',
+      'log.storyToken': 'historia: token "{t}" no encontrado', 'log.storyTimeout': 'tiempo agotado en la historia',
+      'log.storySolver': 'historia: error del solver: {e}', 'log.storyNewType': 'historia: tipo nuevo {type}', 'log.storyStuck': 'historia atascada',
+      'log.sectionNotFound': 'sección {n} no encontrada en la pantalla de secciones',
+      'log.sectionNotLoaded': 'la sección {n} no cargó (unidades en pantalla: {units})',
+      'log.grindStart': 'grind iniciado', 'log.pathFail': 'no se pudo leer el camino: {e}',
+      'log.blocked': 'detenido: el siguiente nodo no se abrió. Recarga la página y pulsa Iniciar de nuevo.',
+      'log.complete': 'nada más que hacer: camino 100 % dorado',
+      'log.target': '{mode} → unidad {u}, nodo {n} ({type}: {name})',
+      'log.openFail': 'no se pudo abrir el nodo activo (intento {n})',
+      'log.refused': 'Duolingo rechazó el Legendario de este nodo (error {status}); pasa incluso a mano',
+      'log.notAdvanced': 'el nodo no avanzó ({r}), intento {n}', 'log.skipNode': 'saltando este nodo por ahora',
+      'log.lessonResult': 'lección: {r}', 'log.grindStopped': 'grind detenido', 'log.grindResult': 'grind: {r}',
+      'log.stopped': 'detenido', 'log.cmdFail': 'el comando {cmd} falló: {e}',
+      'pop.running.grind': 'auto grind en marcha…', 'pop.running.lesson': 'resolviendo lección…',
+      'pop.openDuo': 'abre duolingo.com', 'pop.reload': 'recarga la pestaña de Duolingo', 'pop.complete': 'Camino completo.',
+      'pop.footer1': 'El HUD completo está dentro de Duolingo (corona en la esquina · Alt+H).',
+      'pop.footer2': 'Ctrl+Enter resolver y seguir · Alt+Enter resolver · Alt+S saltar · Alt+L lección · Alt+G auto grind · Alt+X detener',
+    },
+  };
+  const LOCALES = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
+  const LANGS = Object.keys(DICT);
+  const LS_KEY = 'alp.lang';
+
+  // v0.11.2: o idioma é escolhido nas bandeirinhas (HUD e popup). Sem escolha salva,
+  // começa pelo idioma do navegador se for pt/en/es; senão, inglês.
+  const fromBrowser = () => {
+    const list = (typeof navigator !== 'undefined' && (navigator.languages?.length ? navigator.languages : [navigator.language])) || [];
+    for (const l of list) {
+      const base = String(l || '').toLowerCase().split('-')[0];
+      if (DICT[base]) return base;
+    }
+    return 'en';
+  };
+  let lang = (() => {
+    try { const v = localStorage.getItem(LS_KEY); if (LANGS.includes(v)) return v; } catch { /* ok */ }
+    return fromBrowser();
+  })();
+  const subs = new Set();
+  const t = (k, vars) => {
+    let s = DICT[lang][k] ?? DICT.en[k] ?? DICT.pt[k] ?? k;
+    if (vars) s = s.replace(/\{(\w+)\}/g, (_, v) => (vars[v] ?? ''));
+    return s;
+  };
+  const setLang = (l) => {
+    if (!LANGS.includes(l) || l === lang) return false;
+    lang = l;
+    try { localStorage.setItem(LS_KEY, l); } catch { /* ok */ }
+    for (const fn of subs) { try { fn(l); } catch { /* ok */ } }
+    return true;
+  };
+  const api = Object.freeze({
+    get lang() { return lang; },
+    get locale() { return LOCALES[lang]; },
+    t, setLang, langs: LANGS,
+    onChange: (fn) => { subs.add(fn); return () => subs.delete(fn); },
+  });
+  if (typeof window !== 'undefined') Object.defineProperty(window, KEY, { value: api });
+})();

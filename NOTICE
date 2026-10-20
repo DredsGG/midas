@@ -1,0 +1,11 @@
+Midas
+Copyright 2026 André Miller Fleck (Dreds)
+
+This product is a rewrite inspired by and partly based on Autolingo,
+licensed under the Apache License, Version 2.0:
+  - Autolingo by 2-X / Kris  (https://github.com/2-X/autolingo)
+  - adaptation by Smint       (https://github.com/smintf/autolingo)
+  - fork by krisl             (https://github.com/krisl/autolingo)
+
+Changes: new lesson and story solvers, Auto Grind for Legendary across the
+whole path, in-page HUD, speed presets, i18n (PT/EN/ES) and themes.

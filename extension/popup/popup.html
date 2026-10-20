@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Midas</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../images/icon-48.png" alt="">
+    <div>
+      <h1>Midas</h1>
+      <p id="running" class="muted" data-i18n="chip.stopped"></p>
+    </div>
+    <button id="theme" class="tswitch" type="button" role="switch" aria-checked="true"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.8"/><g stroke-width="2.4" stroke-linecap="round"><path d="M12 1.6v2.8M12 19.6v2.8M1.6 12h2.8M19.6 12h2.8M4.6 4.6l2 2M17.4 17.4l2 2M4.6 19.4l2-2M17.4 6.6l2-2"/></g></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg><span class="knob"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.8"/><g stroke-width="2.4" stroke-linecap="round"><path d="M12 1.6v2.8M12 19.6v2.8M1.6 12h2.8M19.6 12h2.8M4.6 4.6l2 2M17.4 17.4l2 2M4.6 19.4l2-2M17.4 6.6l2-2"/></g></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg></span></button><div class="langs" role="group" aria-label="Idioma / Language"><button class="flag" data-lang="pt" title="Português" aria-label="Português"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.6 18.4 7 10 12.4 1.6 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.3" fill="#002776"/><path d="M6.9 6.2q3.3-.9 6.2.9" stroke="#fff" stroke-width=".7" fill="none"/></svg></button><button class="flag" data-lang="en" title="English" aria-label="English"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#fff"/><path d="M0 0h20v1.08H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20v1.07H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20V14H0z" fill="#b22234"/><rect width="9" height="7.54" fill="#3c3b6e"/><g fill="#fff"><circle cx="1.6" cy="1.4" r=".45"/><circle cx="3.6" cy="1.4" r=".45"/><circle cx="5.6" cy="1.4" r=".45"/><circle cx="7.6" cy="1.4" r=".45"/><circle cx="2.6" cy="2.9" r=".45"/><circle cx="4.6" cy="2.9" r=".45"/><circle cx="6.6" cy="2.9" r=".45"/><circle cx="1.6" cy="4.4" r=".45"/><circle cx="3.6" cy="4.4" r=".45"/><circle cx="5.6" cy="4.4" r=".45"/><circle cx="7.6" cy="4.4" r=".45"/><circle cx="2.6" cy="5.9" r=".45"/><circle cx="4.6" cy="5.9" r=".45"/><circle cx="6.6" cy="5.9" r=".45"/></g></svg></button><button class="flag" data-lang="es" title="Español" aria-label="Español"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg></button></div>
+  </header>
+
+  <section class="card">
+    <div class="row between">
+      <h2 class="ttl"><span data-i18n="grind.title"></span><button class="info" data-help="help.grind">i</button></h2>
+      <button id="grind" class="primary" data-i18n="btn.start"></button>
+    </div>
+    <p class="muted small sub" data-i18n="grind.sub"></p>
+    <div class="bar"><div id="bar-fill"></div></div>
+    <div class="stats">
+      <div><b id="s-leg">–</b><span data-i18n="stat.legendary"></span></div>
+      <div><b id="s-todo">–</b><span data-i18n="stat.left"></span></div>
+      <div><b id="s-eta">–</b><span class="ttl"><span data-i18n="stat.eta"></span><button class="info" data-help="help.stats">i</button></span></div>
+    </div>
+    <p id="current" class="muted small"></p>
+  </section>
+
+  <section class="card">
+    <h2 class="ttl"><span data-i18n="lesson.title"></span><button class="info" data-help="help.lesson">i</button></h2>
+    <div class="row gap">
+      <button data-cmd="solveNext" data-i18n="act.solveNext"></button>
+      <button data-cmd="solve" data-i18n="act.solve"></button>
+      <button data-cmd="lesson" data-i18n="act.lesson"></button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 class="ttl"><span data-i18n="speed.title"></span><button class="info" data-help="help.speed">i</button></h2>
+    <div class="seg"><button data-p="rage">Rage</button><button data-p="legit">Legit</button><button data-p="manual">Manual</button></div>
+    <p id="hint" class="muted small"></p>
+    <label class="row between"><span class="ttl"><span data-i18n="set.delay"></span><button class="info" data-help="help.delay">i</button></span><span><input id="delay" type="range" min="0" max="5000" step="50"> <output id="delay-out"></output> ms</span></label>
+    <label class="row between"><span class="ttl"><span data-i18n="set.humanize"></span><button class="info" data-help="help.humanize">i</button></span><input id="humanize" type="checkbox"></label>
+  </section>
+
+  <details class="card">
+    <summary><span class="ttl"><span data-i18n="log.title"></span><button class="info" data-help="help.log">i</button></span> <button id="copy" class="copy" data-i18n="log.copy"></button></summary>
+    <pre id="log"></pre>
+    <p id="unknown" class="muted small"></p>
+  </details>
+
+  <footer class="muted small">
+    <span data-i18n="pop.footer1"></span><br>
+    <span data-i18n="pop.footer2"></span>
+    <span class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span data-i18n="credit.by"></span> <a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a> <span id="ver"></span></span>
+  </footer>
+  <div id="tip" class="tip" role="tooltip" hidden></div>
+  <script src="../src/i18n.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
