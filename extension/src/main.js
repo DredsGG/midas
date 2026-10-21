@@ -233,15 +233,32 @@
   // largura) e, depois do toque, a cópia da lacuna fica visível. Com banco de palavras,
   // tocar fora dele DESFAZ a resposta — então só o banco vale.
   // re-consulta o banco antes de cada clique (o React re-renderiza após cada toque)
+  const findToken = (t) => bankTokens().find((b) => tokenMatches(b, t)) ||
+    ($(S.wordBank) ? null : tokenButtons().find((b) => tokenMatches(b, t)));
   const tapTexts = async (texts) => {
     for (const t of texts || []) {
-      const btn = bankTokens().find((b) => tokenMatches(b, t)) ||
-        ($(S.wordBank) ? null : tokenButtons().find((b) => tokenMatches(b, t)));
-      if (!btn) { report(T('log.tokenNotFound', { t }), 'warn'); continue; }
+      let btn = findToken(t);
+      // resposta com várias palavras ("to go") mas o banco tem uma palavra por botão
+      // ("to", "go"): toca cada palavra, se todas existirem
+      if (!btn && /\s/.test(String(t).trim())) {
+        const words = norm(t).split(' ');
+        if (words.every((w) => findToken(w))) {
+          for (const w of words) { const b = findToken(w); b?.click(); await wait(Math.max(35, cfg.delay * 0.45)); }
+          continue;
+        }
+      }
+      if (!btn) {
+        // diagnóstico: mostra o que havia no banco (uma vez por palavra e exercício)
+        const bank = bankTokens().map((b) => norm(b.textContent)).filter(Boolean).join(' · ');
+        const key = t + '|' + bank;
+        if (key !== lastMissing) { lastMissing = key; report(T('log.tokenNotFound', { t }) + (bank ? ` [${bank}]` : ''), 'warn'); }
+        continue;
+      }
       btn.click();
       await wait(Math.max(35, cfg.delay * 0.45));
     }
   };
+  let lastMissing = null;
 
   const matchPairs = async (pairs, L, R) => {
     // 1) pares de áudio (sem texto): os dois tokens do par compartilham o data-test
@@ -606,7 +623,11 @@
         press();
       } else if (status === 'GUESSING') {
         idleSince = Date.now();
-        const cur = getChallenge()?.ch || null;
+        // v0.12.2: o exercício é identificado pelo id (ou tipo+texto), não pelo objeto: em
+        // alguns tapComplete o React recria o objeto a cada render, e o loop resolvia o mesmo
+        // exercício sem parar (6 min de "token não encontrado" até o timeout da lição)
+        const curCh = getChallenge()?.ch || null;
+        const cur = curCh && (curCh.id || `${curCh.type}|${curCh.prompt ?? ''}|${(curCh.displayTokens || []).map((x) => x?.text ?? '').join('')}`);
         if (cur && cur === answeredCh && !isEnabled($(S.next)) && resolveTries < 2 &&
             Date.now() - answeredAt > 1500) {
           // a resposta não "pegou" (ex.: no modo rage o solver rodou antes dos botões
