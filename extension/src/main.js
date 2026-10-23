@@ -114,7 +114,10 @@
   // Duo Radio: não tem challenge-header; o desafio fica num componente com
   // onRadioExerciseGrading acima dos botões. Os controles do player usam imagens
   // em /images/duoRadio/. O áudio corre em tempo real (não dá para pular).
-  const radioOn = () => !!document.querySelector('img[src*="/duoRadio/"]');
+  // v0.12.3: desde out/2026 o exercício "Complete a conversa" (dialogue) também usa os
+  // avatares de /images/duoRadio/transcript/ — só é rádio de verdade se NÃO houver
+  // challenge-header (senão o loop entrava no ramo do rádio e ficava parado até o timeout)
+  const radioOn = () => !$(S.header) && !!document.querySelector('img[src*="/duoRadio/"]');
   const getRadio = () => {
     for (const el of $$('[data-test="challenge-choice"], [data-test$="-challenge-tap-token"], button')) {
       const p = walkUp(fiberOf(el), (f) =>
@@ -207,8 +210,13 @@
     const first = span.childNodes?.[0];
     if (first?.nodeType === 3) keys.add(norm(first.textContent));
     keys.add(norm(span.textContent));
-    const pre = dt.split('-challenge-tap-token')[0];
-    if (pre && pre !== dt) keys.add(norm(pre));
+    // v0.12.8: o prefixo do data-test só vale para token de UMA palavra. Em "will take" o
+    // data-test é "take-challenge-tap-token will": o prefixo "take" fazia o botão "will take"
+    // casar com a resposta "take" (lacunas trocadas → resposta errada → loop no "Corrija o erro")
+    if (dt.endsWith('-challenge-tap-token')) {
+      const pre = dt.slice(0, -'-challenge-tap-token'.length);
+      if (pre) keys.add(norm(pre));
+    }
     const words = norm(dt.replace('-challenge-tap-token', ' ')).split(' ');
     return { keys, words };
   };
@@ -233,8 +241,18 @@
   // largura) e, depois do toque, a cópia da lacuna fica visível. Com banco de palavras,
   // tocar fora dele DESFAZ a resposta — então só o banco vale.
   // re-consulta o banco antes de cada clique (o React re-renderiza após cada toque)
-  const findToken = (t) => bankTokens().find((b) => tokenMatches(b, t)) ||
-    ($(S.wordBank) ? null : tokenButtons().find((b) => tokenMatches(b, t)));
+  // texto exato do botão vence qualquer casamento aproximado
+  const tokenText = (b) => {
+    const span = b.querySelector?.(S.tapText) || b;
+    const first = span.childNodes?.[0];
+    return norm(first?.nodeType === 3 ? first.textContent : span.textContent);
+  };
+  const pickToken = (pool, t) => {
+    const k = norm(t);
+    return pool.find((b) => tokenText(b) === k) || pool.find((b) => tokenMatches(b, t));
+  };
+  const findToken = (t) => pickToken(bankTokens(), t) ||
+    ($(S.wordBank) ? null : pickToken(tokenButtons(), t));
   const tapTexts = async (texts) => {
     for (const t of texts || []) {
       let btn = findToken(t);
@@ -244,6 +262,13 @@
         const words = norm(t).split(' ');
         if (words.every((w) => findToken(w))) {
           for (const w of words) { const b = findToken(w); b?.click(); await wait(Math.max(35, cfg.delay * 0.45)); }
+          continue;
+        }
+        // parte da resposta já vem impressa na frase ("I want to ___" com resposta "to call"
+        // e banco só com "call"): toca só as palavras que existem no banco
+        const have = words.filter((w) => findToken(w));
+        if (have.length) {
+          for (const w of have) { const b = findToken(w); b?.click(); await wait(Math.max(35, cfg.delay * 0.45)); }
           continue;
         }
       }
@@ -278,7 +303,8 @@
         for (const f of fields) {
           const v = pair[f];
           if (v == null || typeof v === 'object') continue;
-          const b = pool.find((x) => x !== except && tokenMatches(x, v));
+          const rest = pool.filter((x) => x !== except);
+          const b = pickToken(rest, v);
           if (b) return b;
         }
         return null;
@@ -317,7 +343,24 @@
     return ok;
   };
 
-  const skipChallenge = () => clickEl($(S.skip));
+  // v0.12.6: usa o "Pular"/"Não posso falar agora" VISÍVEL mais recente (pode haver cópia
+  // velha no DOM durante a transição). Em tentativas ímpares chama o onClick do React direto.
+  const skipButton = () => {
+    const vis = $$(S.skip).filter((b) => isEnabled(b) && isVisible(b));
+    return vis[vis.length - 1] || $(S.skip);
+  };
+  const skipChallenge = (attempt = 0) => {
+    const b = skipButton();
+    if (!isEnabled(b)) return false;
+    if (attempt % 2 === 1) {
+      const p = propsOf(b);
+      if (typeof p?.onClick === 'function') {
+        try { p.onClick({ preventDefault() {}, stopPropagation() {}, currentTarget: b, target: b, nativeEvent: new MouseEvent('click') }); return true; } catch { /* cai no clique */ }
+      }
+    }
+    b.click();
+    return true;
+  };
 
   // ───────────────────────── solvers ─────────────────────────
   const byIndex = (prefer) => ({ ch }) => pickIndex(ch.correctIndex ?? ch.correctIndices?.[0], prefer);
@@ -487,11 +530,11 @@
     characterMatch: matchLike,
     extendedMatch: matchLike,
     extendedListenMatch: matchLike,
-    speak: skipChallenge,
-    listenSpeak: skipChallenge,
-    characterTrace: skipChallenge,
-    characterWrite: skipChallenge,
-    svgPuzzle: skipChallenge,
+    speak: () => skipChallenge(),
+    listenSpeak: () => skipChallenge(),
+    characterTrace: () => skipChallenge(),
+    characterWrite: () => skipChallenge(),
+    svgPuzzle: () => skipChallenge(),
   };
 
   // solver genérico para tipos novos: tenta pelo formato dos dados
@@ -571,7 +614,38 @@
   // A sessão é detectada pelo que está NA TELA, não pela URL: stories do Reforço
   // diário (e outras) abrem por cima do /learn, sem mudar o endereço.
   const STORY_ANCHORS = '[data-test="stories-element"], [data-test="stories-player-continue"], [data-test="stories-player-done"], [data-test="close-button-stories"], [data-test="story-start"]';
-  const sessionVisible = () => !!$(STORY_ANCHORS) || !!getStatus() || !!$(S.quit);
+  const sessionVisible = () => !!$(STORY_ANCHORS) || !!getStatus() || !!$(S.quit) || !!$(STREAK_OPT);
+
+  // Tela "Escolha uma nova meta de ofensiva" (fim de sessão): André quer sempre a meta
+  // mais alta. Opções com data-test="streak-goal-option" ("650 dias de ofensiva · Ganhe
+  // 125 cristais"); o botão "Eu consigo!" só habilita depois de escolher.
+  const STREAK_OPT = '[data-test="streak-goal-option"]';
+  const STREAK_COMMIT_RE = /^(eu consigo|i can do it|¡?puedo hacerlo|me comprometo|i'm committed)!?$/i;
+  let streakSeen = 0, streakClicked = false;
+  const streakDays = (el) => {
+    const m = norm(el.textContent).replace(/(\d)[.,](?=\d{3}\b)/g, '$1').match(/\d+/);
+    return m ? +m[0] : -1;
+  };
+  const handleStreakGoal = async () => {
+    const opts = $$(STREAK_OPT).filter(isVisible);
+    if (!opts.length) return false;
+    const best = opts.reduce((a, b) => (streakDays(b) > streakDays(a) ? b : a));
+    const target = best.closest('button, [role="button"], [role="radio"]') || best;
+    if (!streakSeen || Date.now() - streakSeen > 60000) { streakSeen = Date.now(); streakClicked = false; } // tela nova
+    if (Date.now() - streakSeen > 20000) return false; // não saiu da tela: deixa o fluxo normal seguir
+    // um clique só por tela (clicar de novo poderia desmarcar)
+    if (!streakClicked) {
+      target.click();
+      streakClicked = true;
+      report(T('log.streakGoal', { n: streakDays(best) }));
+      await sleep(350);
+    }
+    const commit = $$('button, [role="button"]').find((b) => isEnabled(b) && !b.closest(STREAK_OPT) &&
+      STREAK_COMMIT_RE.test(norm(b.textContent))) || findNext();
+    commit?.click();
+    await sleep(400);
+    return true;
+  };
   // devolve true quando a sessão sumiu da tela por um tempo contínuo
   const goneFor = (ms) => {
     let since = 0;
@@ -597,6 +671,9 @@
     let answeredCh = null, answeredAt = 0, idleSince = Date.now(), lastPress = 0, solvedCount = 0;
     let radioDone = null, resolveTries = 0;
     const answeredRadio = new WeakSet();
+    const solveCounts = new Map();
+    const skipTries = new Map();
+    let radioIdleSince = 0;
     const gone = goneFor(1500);
     // evita clique duplo no mesmo botão antes do React trocar de tela
     const press = () => {
@@ -607,6 +684,7 @@
     };
     while (!token.stop) {
       if (Date.now() - t0 > timeoutMs) { report(T('log.lessonTimeout'), 'warn'); return 'timeout'; }
+      if ($(STREAK_OPT) && (await handleStreakGoal())) { idleSince = Date.now(); continue; }
       if (gone()) return 'done';
       const status = getStatus();
       if (status !== 'GUESSING') answeredCh = null;
@@ -616,6 +694,10 @@
         // Sem regra de "travado" aqui — o limite é o timeout da sessão.
         idleSince = Date.now();
         const rc = getRadio()?.ch;
+        // sem pergunta de rádio e sem botão por muito tempo = o loop não entende a tela
+        if (rc || findNext()) radioIdleSince = 0;
+        else if (!radioIdleSince) radioIdleSince = Date.now();
+        else if (Date.now() - radioIdleSince > 90000) { report(T('log.noNext', { status: 'RADIO' }), 'warn'); return 'stuck'; }
         const key = rc && `${rc.type}:${rc.startTime ?? ''}:${rc.prompt ?? ''}`;
         if (rc && key !== radioDone && !answeredRadio.has(rc)) {
           if (await solveCurrent()) { radioDone = key; answeredRadio.add(rc); solvedCount++; await wait(Math.max(150, cfg.delay * 0.5)); }
@@ -639,6 +721,26 @@
         if (cur && cur !== answeredCh) {
           answeredCh = cur;
           resolveTries = 0;
+          // trava de segurança: o mesmo exercício resolvido de novo e de novo (o status
+          // oscila e zera answeredCh) → pula ou desiste em vez de girar até o timeout.
+          // 3 vale: o Duolingo repete no fim da lição um exercício errado, com o mesmo id.
+          const n = (solveCounts.get(cur) || 0) + 1;
+          solveCounts.set(cur, n);
+          if (n > 3) {
+            const t = curCh?.type;
+            emit('stuckType', { type: t });
+            // o Duolingo devolve o exercício pulado/errado ("Corrija o erro de antes"):
+            // pular de novo vira loop — depois de 6 voltas desiste da lição
+            if (n <= 6 && isEnabled(skipButton())) {
+              report(T('log.stuckSkip', { type: t }), 'warn');
+              skipChallenge();
+              answeredAt = Date.now();
+              await sleep(300);
+              continue;
+            }
+            report(T('log.stuckAbandon', { type: t }), 'error');
+            return 'stuck';
+          }
           if (cfg.delay > 0) await wait(cfg.delay * 0.6);
           if (await solveCurrent()) solvedCount++;
           answeredAt = Date.now();
@@ -648,10 +750,23 @@
         }
         if (!press() && answeredCh && Date.now() - answeredAt > 4000) {
           const t = getChallenge()?.ch?.type;
-          if (isEnabled($(S.skip))) {
+          if (isEnabled(skipButton())) {
+            // "Pular" que não pula: depois de 4 tentativas desiste da lição (antes girava 8 min)
+            const tries = (skipTries.get(answeredCh) || 0) + 1;
+            skipTries.set(answeredCh, tries);
+            // v0.12.10: "Não posso falar agora" que não pula = a página já desligou a fala
+            // antes (o 2º clique na mesma página não faz nada). Depois do reload as lições vêm
+            // sem fala → recarrega já, sem gastar tentativa do nó
+            if (tries > 2 && /speak/i.test(t || '')) { report(T('log.speakReload'), 'warn'); return 'reload'; }
+            if (tries > 4) {
+              const all = $$(S.skip);
+              report(T('log.skipFailed', { type: t, n: all.length, v: all.filter(isVisible).length, status }), 'error');
+              emit('stuckType', { type: t });
+              return 'stuck';
+            }
             report(T('log.stuckSkip', { type: t }), 'warn');
             emit('stuckType', { type: t });
-            skipChallenge();
+            skipChallenge(tries);
             answeredAt = Date.now();
           } else if (Date.now() - answeredAt > 15000) {
             // Titãs não tem "Pular": desiste da lição para o grind seguir em frente
@@ -725,7 +840,7 @@
   // o data-test do token é "<texto>-challenge-tap-token", mas frases com espaço
   // vêm embaralhadas ("거야-challenge-tap-token 말하는"): casa por palavras
   const tapPhrase = async (phrase) => {
-    const t = tokenButtons().find((b) => tokenMatches(b, phrase));
+    const t = pickToken(tokenButtons(), phrase);
     if (!t) { report(T('log.storyToken', { t: norm(phrase) }), 'warn'); return false; }
     t.click();
     await wait(Math.max(35, cfg.delay * 0.45));
@@ -757,10 +872,16 @@
 
   const runStory = async (token, { timeoutMs = 10 * 60e3 } = {}) => {
     const t0 = Date.now();
-    let lastLine = null, idleSince = Date.now(), lastSkip = 0;
+    let lastLine = null, idleSince = Date.now(), lastSkip = 0, solvedAt = 0, storyRetries = 0;
+    // v0.12.5: alguns desafios (ex.: GAP_FILL de 2 lacunas) não trazem lineIndex — só
+    // trackingProperties.line_index. Com a chave antiga (lineIndex) todos viravam
+    // "undefined" e, depois do primeiro, nenhum era resolvido (história travada).
+    const lineKey = (se) => `${se.lineIndex ?? se.trackingProperties?.line_index ?? ''}|${se.type}|` +
+      `${se.sentence?.text ?? se.question?.text ?? ''}|${(se.choices || []).map((c) => (typeof c === 'string' ? c : c?.text ?? '')).join(',')}`;
     const gone = goneFor(1500);
     while (!token.stop) {
       if (Date.now() - t0 > timeoutMs) { report(T('log.storyTimeout'), 'warn'); return 'timeout'; }
+      if ($(STREAK_OPT) && (await handleStreakGoal())) continue;
       if (gone()) return 'done';
       const done = $(SB.done);
       const start = $(SB.start);
@@ -768,8 +889,18 @@
       else if (isEnabled(done)) { if (cfg.delay > 0) await wait(cfg.delay * 0.6); done.click(); idleSince = Date.now(); }
       else {
         const ac = activeStoryChallenge();
-        if (ac?.se && ac.se.lineIndex !== lastLine) {
-          lastLine = ac.se.lineIndex;
+        const key = ac?.se ? lineKey(ac.se) : null;
+        // resolveu mas o "Continuar" não habilitou e nenhum token foi usado: os cliques
+        // foram cedo demais (botões ainda entrando na tela) → resolve de novo (até 3x)
+        if (key && key === lastLine && !isEnabled($(SB.cont)) && Date.now() - solvedAt > 2500 && storyRetries < 3 &&
+            !$$(SB.token).some((b) => b.getAttribute('aria-disabled') === 'true')) {
+          storyRetries++;
+          lastLine = null;
+        }
+        if (key && key !== lastLine) {
+          if (key !== lastLine && lastLine !== null) storyRetries = 0;
+          lastLine = key;
+          solvedAt = Date.now();
           const fn = STORY_SOLVERS[ac.se.type];
           if (cfg.delay > 0) await wait(cfg.delay * 0.8);
           if (fn) { try { await fn(ac.se); } catch (e) { report(T('log.storySolver', { e: e.message }), 'error'); } }
@@ -985,6 +1116,18 @@
     return lv ? { lv, mode: 'legendary' } : null;
   };
 
+  const RELOAD_EVERY_MS = 60 * 60e3;
+  // travou ("o próximo nó não abriu"): recarrega e continua. Espera cresce se voltar a
+  // travar sem progresso nenhum, para não ficar recarregando sem parar.
+  const BLOCK_KEY = 'alp.blockedReloads';
+  const BLOCK_WAIT_S = [20, 120, 300, 900, 1800];
+  const blockedWait = () => {
+    let n = 0;
+    try { n = JSON.parse(localStorage.getItem(BLOCK_KEY) || '{}').n || 0; } catch { /* sem storage */ }
+    try { localStorage.setItem(BLOCK_KEY, JSON.stringify({ n: n + 1, at: Date.now() })); } catch { /* idem */ }
+    return BLOCK_WAIT_S[Math.min(n, BLOCK_WAIT_S.length - 1)];
+  };
+
   const grind = async (token, opts = {}) => {
     // início manual = lista de pulos zerada (dá nova chance a nós que falharam antes);
     // retomada automática após reload = mantém a lista salva
@@ -996,6 +1139,14 @@
     grindState.done = 0;
     report(T('log.grindStart'));
     while (!token.stop) {
+      // v0.12.7: a cada 1 h de grind recarrega a página (entre nós, nunca no meio de lição)
+      // e continua sozinho depois do reload
+      if (Date.now() - grindState.startedAt > RELOAD_EVERY_MS) {
+        report(T('log.hourlyReload'));
+        emit('reloading', { fresh: false });
+        await sleep(60000); // a ponte recarrega; se não recarregar, segue o grind
+        grindState.startedAt = Date.now();
+      }
       let levels = cachedLevels, course = cachedCourse;
       cachedLevels = null;
       if (!levels) try { ({ levels, course } = await fetchPath()); cachedCourse = course; }
@@ -1038,6 +1189,11 @@
       }
       const r = started === 'chest' ? 'chest' : await runSession(token);
       if (token.stop) break;
+      if (r === 'reload') {
+        emit('reloading', { fresh: false });
+        await sleep(60000); // a ponte recarrega; se não recarregar, segue
+        continue;
+      }
 
       // volta ao caminho e confere se o nó mudou de estado
       if (sessionVisible() || !onLearnPage()) await go('/learn');
@@ -1059,6 +1215,7 @@
       const upgraded = after && (after.state !== lv.state || advanced);
       if (upgraded) {
         grindState.done++;
+        try { localStorage.removeItem(BLOCK_KEY); } catch { /* sem storage */ }
         grindState.attempts[lv.id] = 0;
         if (mode === 'normal') justPassedId = lv.id; // emenda a Titãs do mesmo nó
       }
@@ -1087,11 +1244,13 @@
 
   // ───────────────────────── comandos ─────────────────────────
   let current = null; // { stop:boolean, kind }
-  const stopAll = () => {
+  // manual = o usuário mandou parar (só isso desliga o grind de vez); fim por conta
+  // própria (lição avulsa, grind completo) manda manual=false
+  const stopAll = (manual = true) => {
     const was = current?.kind || null;
     if (current) current.stop = true;
     current = null;
-    emit('state', { running: null, was });
+    emit('state', { running: null, was, manual });
   };
 
   const commands = {
@@ -1112,7 +1271,7 @@
       emit('state', { running: 'lesson' });
       const r = await runSession(token);
       report(T('log.lessonResult', { r }));
-      if (current === token) stopAll();
+      if (current === token) stopAll(false);
     },
     grind: async (opts) => {
       if (current?.kind === 'grind') { stopAll(); report(T('log.grindStopped')); return; } // alterna
@@ -1121,9 +1280,19 @@
       emit('state', { running: 'grind' });
       const r = await grind(token, opts || {});
       report(T('log.grindResult', { r }));
-      if (current === token) stopAll();
+      if (r === 'blocked' && !token.stop && current === token) {
+        // continua "rodando": espera, recarrega a página e retoma com a lista de pulos zerada
+        const secs = blockedWait();
+        report(T('log.blockedReload', { s: secs }), 'warn');
+        for (let i = 0; i < secs && !token.stop; i++) await sleep(1000);
+        if (!token.stop && current === token) { emit('reloading', { fresh: true }); return; }
+      }
+      if (current === token) stopAll(false);
     },
     stop: () => { stopAll(); report(T('log.stopped')); },
+    // outra aba assumiu o grind: para aqui sem desligar o grind salvo
+    yield: () => { if (current?.kind === 'grind') { stopAll(false); report(T('log.otherTab'), 'warn'); } },
+    note: (k) => report(T('log.' + k), 'warn'),
     theme: (t) => emit('theme', t), // escolha feita no popup → HUD
     lang: (l) => window[Symbol.for('alp.i18n')]?.setLang?.(l), // escolha feita no popup
   };

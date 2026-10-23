@@ -37,14 +37,45 @@
     if (ch.alp_theme?.newValue) send('theme', ch.alp_theme.newValue);
   });
 
-  // retoma o grind se a página recarregar no meio (crash, deploy do Duolingo, etc.)
+  // v0.12.9: uma aba só roda o grind. Cada aba tem um id que sobrevive ao reload
+  // (sessionStorage é por aba); a aba que roda renova alp_lock a cada 10 s.
+  let tabId = null;
+  try { tabId = sessionStorage.getItem('alp.tab'); } catch { /* ok */ }
+  if (!tabId) { tabId = Math.random().toString(36).slice(2); try { sessionStorage.setItem('alp.tab', tabId); } catch { /* ok */ } }
+  const LOCK_TTL = 30000;
+  const otherTabRunning = async () => {
+    const { alp_lock } = await chrome.storage.local.get('alp_lock');
+    return !!alp_lock && alp_lock.id !== tabId && Date.now() - alp_lock.at < LOCK_TTL;
+  };
+  let beat = null, beatStart = 0;
+  const holdLock = safe(async () => { await chrome.storage.local.set({ alp_lock: { id: tabId, at: Date.now() } }); });
+  const startBeat = () => { if (!beat) { beatStart = Date.now(); holdLock(); beat = setInterval(holdLock, 10000); } };
+  const stopBeat = safe(async () => {
+    if (beat) { clearInterval(beat); beat = null; }
+    const { alp_lock } = await chrome.storage.local.get('alp_lock');
+    if (alp_lock?.id === tabId) await chrome.storage.local.remove('alp_lock');
+  });
+  // outra aba começou o grind: esta sai sem desligar o grind (não é o Parar)
+  chrome.storage.onChanged.addListener((ch) => {
+    const l = ch.alp_lock?.newValue;
+    // duas abas retomando juntas (ex.: ↻ recarrega todas): fica a de id menor
+    if (beat && l && l.id !== tabId && (Date.now() - beatStart > 5000 || l.id < tabId)) {
+      clearInterval(beat); beat = null; send('yield');
+    }
+  });
+
+  // retoma o grind se a página recarregar no meio (crash, deploy do Duolingo, etc.) —
+  // só se nenhuma outra aba já estiver rodando
   let resumed = false;
   const maybeResume = safe(async () => {
     if (resumed) return;
     resumed = true;
     const { alp_grind } = await chrome.storage.local.get('alp_grind');
     if (alp_grind?.active) {
-      setTimeout(() => send('grind', { skip: alp_grind.skip || {}, resume: true }), 2500);
+      setTimeout(safe(async () => {
+        if (await otherTabRunning()) { send('note', 'otherTab'); return; }
+        send('grind', { skip: alp_grind.skip || {}, resume: true });
+      }), 2500 + Math.floor(Math.random() * 1500));
     }
   });
 
@@ -109,9 +140,19 @@
         // explicitamente; um reload da página não emite nada, então o grind retoma.
         const { alp_grind = {} } = await chrome.storage.local.get('alp_grind');
         let active = alp_grind.active;
+        if (data.running === 'grind') startBeat(); else if (data.running === null && data.was === 'grind') await stopBeat();
         if (data.running === 'grind') active = true;
-        else if (data.running === null && data.was === 'grind') active = false;
+        // v0.12.7: só o Parar desliga; o grind terminar sozinho não (completo já zera em grindDone)
+        else if (data.running === null && data.was === 'grind' && data.manual !== false) active = false;
         await chrome.storage.local.set({ alp_running: data.running, alp_grind: { ...alp_grind, active } });
+        break;
+      }
+      case 'reloading': {
+        // recarga programada (1 h) ou por travamento: garante "ativo" salvo antes do reload
+        const { alp_grind = {} } = await chrome.storage.local.get('alp_grind');
+        await chrome.storage.local.set({ alp_grind: { ...alp_grind, active: true, skip: data?.fresh ? {} : (alp_grind.skip || {}) } });
+        if (flushT) { clearTimeout(flushT); await flush(); }
+        location.reload();
         break;
       }
       case 'unknownType': {

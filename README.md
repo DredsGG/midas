@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.12.2-f5b301)
+![Version](https://img.shields.io/badge/version-0.12.10-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/midas-popup.png" width="380" alt="Midas popup: Auto Grind progress, current lesson controls and speed presets">
@@ -19,7 +19,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 
 ## What it does
 
-- **Auto Grind (“Gild everything”).** Reads your whole learning path, finishes the lessons you haven't done, then runs Legendary on every `skill`, `story` and `practice` node, from the first unit to the last. It checks each node actually turned legendary, retries once, and stops on its own when nothing is left. If the tab reloads mid-run, it picks up where it stopped.
+- **Auto Grind (“Gild everything”).** Reads your whole learning path, finishes the lessons you haven't done, then runs Legendary on every `skill`, `story` and `practice` node, from the first unit to the last. It checks each node actually turned legendary and retries once. It finishes on its own when nothing is left; otherwise it keeps going until you press **Stop**: if the tab reloads mid-run it picks up where it stopped, it reloads the page by itself every hour (between nodes) and whenever the path gets stuck, and only one Duolingo tab grinds at a time. When Duolingo asks for a new streak goal, it picks the highest one.
 - **Lesson solver.** 40+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added.
 - **Story solver.** Multiple choice, select phrase, arrange, gap fill, point-to-phrase and match.
 - **In-page HUD.** A gold crown in the corner of Duolingo opens a draggable, resizable panel (shadow DOM, Duolingo's own colors) with live progress, current lesson controls, settings and log.
