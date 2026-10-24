@@ -35,9 +35,12 @@ jobs:
         env:
           NOTES: |
             ### Install
-            1. Download **midas-${{ github.event.release.tag_name }}.zip** below.
-            2. Open `chrome://extensions` and turn on **Developer mode**.
-            3. Drag the zip onto the page (or unzip it and use **Load unpacked**).
+            1. Download **midas-${{ github.event.release.tag_name }}.zip** below and extract it to a folder you'll keep (e.g. `Documents\Midas`).
+            2. Open **COMO-INSTALAR.html** in that folder: a step-by-step guide in Portuguese, English and Spanish.
+            3. Short version: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick the folder that has `manifest.json`.
+
+            ### Update
+            Midas shows a gold card when a new version is out. Click **Update**, extract the new zip **over the same folder**, and it reloads itself within a minute.
         run: |
           gh release upload "$TAG" "midas-$TAG.zip" --clobber
           gh release view "$TAG" --json body -q .body > old.md

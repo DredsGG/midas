@@ -19,6 +19,7 @@
     logs: [],
     unknown: new Set(),
     ui: { open: true, logOpen: false, x: null, y: null, ...loadUi() },
+    upd: {}, updStatus: null, // alp_update (do service worker) + estado do último clique
   };
 
   const fmtDur = (ms) => {
@@ -42,6 +43,9 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const CROWN = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11l6 5 6-9 6 9 6-5-2.5 13h-19z" fill="rgb(var(--color-bee,255,199,0))"/><path d="M6.5 24h19v3h-19z" fill="rgb(var(--color-bee,255,199,0))" opacity=".75"/><circle cx="16" cy="6" r="2" fill="rgb(var(--color-bee,255,199,0))"/><circle cx="3.5" cy="10" r="1.8" fill="rgb(var(--color-bee,255,199,0))"/><circle cx="28.5" cy="10" r="1.8" fill="rgb(var(--color-bee,255,199,0))"/></svg>`;
+
+  const ICON_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 7h-4.5v6h-5v-6H5z"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg>';
+  const ICON_REFRESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.3A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.3A10 10 0 0 0 22 12z"/></svg>';
 
   const CSS = `
   :host { all: initial; }
@@ -161,6 +165,7 @@
     transition: filter .1s; }
   .btn:hover { filter: brightness(1.06); }
   .btn:active { top: 3px; }
+  .btn:disabled { opacity: .6; cursor: default; filter: none; }
   .btn.gold { background: var(--bee); color: #4b3800; box-shadow: 0 4px 0 #cc9f00; }
   .btn.gold:active { box-shadow: 0 1px 0 #cc9f00; }
   .btn.red { background: var(--cardinal); color: #fff; box-shadow: 0 4px 0 #c33c3c; }
@@ -250,6 +255,37 @@
   .stale span { flex: 1; }
   .stale button { border: 0; border-radius: 10px; padding: 6px 10px; font-weight: 800; font-size: 11px; text-transform: uppercase;
     letter-spacing: .05em; background: var(--bee); color: #4b3800; box-shadow: 0 3px 0 #cc9f00; cursor: pointer; }
+  /* atualização (v0.13.0): cartão dourado com o que mudou + linha "procurar atualização" */
+  .upd, .updok { margin: 12px 12px 0; border-radius: 16px; border: 2px solid var(--bee); border-bottom-width: 4px;
+    background: linear-gradient(180deg, rgba(255,200,0,.14), rgba(255,200,0,.04)); padding: 12px; animation: alp-pop .35s cubic-bezier(.3,1.4,.5,1); }
+  @keyframes alp-pop { from { transform: translateY(-6px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+  .upd-h { display: flex; gap: 10px; align-items: center; }
+  .upd-ic { width: 34px; height: 34px; flex: none; border-radius: 12px; background: var(--bee); display: grid; place-items: center; box-shadow: 0 3px 0 #cc9f00; }
+  .upd-ic svg { width: 20px; height: 20px; fill: #4b3800; }
+  .upd-h b { display: block; font-size: 14px; font-weight: 800; }
+  .upd-v { font-size: 12px; font-weight: 800; color: var(--hare); font-variant-numeric: tabular-nums; }
+  .upd-v i { font-style: normal; color: var(--bee); }
+  .wrap[data-theme="light"] .upd-v i { color: var(--gold-text); }
+  .upd-notes { margin: 10px 0 0; padding: 0 0 0 18px; font-size: 12px; color: var(--wolf); display: grid; gap: 3px; max-height: 120px; overflow: auto; }
+  .upd-msg { margin: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--eel); }
+  .upd-btns { display: flex; gap: 8px; margin-top: 12px; }
+  .upd-guide { margin-top: 8px; padding: 0; border: 0; background: none; color: var(--macaw); font-weight: 800; font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .upd-btns .btn { flex: 1; padding: 9px 10px; }
+  .updok { display: flex; gap: 10px; align-items: center; border-color: var(--owl); background: rgba(147,211,51,.10); font-size: 12px; font-weight: 800; }
+  .updok span { flex: 1; }
+  .updok button { border: 0; background: transparent; color: var(--hare); cursor: pointer; font-weight: 800; }
+  .updrow { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 0 12px 10px; }
+  .updbtn { display: inline-flex; align-items: center; gap: 6px; border: 2px solid var(--swan); border-bottom-width: 3px; border-radius: 99px;
+    background: transparent; color: var(--macaw); padding: 4px 11px; font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; cursor: pointer; }
+  .updbtn:hover { background: var(--polar); }
+  .updbtn:active { border-bottom-width: 2px; transform: translateY(1px); }
+  .updbtn svg { width: 12px; height: 12px; fill: currentColor; }
+  .updbtn.spin svg { animation: alp-spin .8s linear infinite; }
+  @keyframes alp-spin { to { transform: rotate(360deg); } }
+  .upd-st { font-size: 11px; font-weight: 700; color: var(--hare); }
+  .upd-st.new { color: var(--bee); cursor: pointer; text-decoration: underline dotted; }
+  .wrap[data-theme="light"] .upd-st.new { color: var(--gold-text); }
+  .fab.upd .dot { background: var(--macaw); }
   .keys kbd { font: 700 10px duolingo-sans, sans-serif; border: 2px solid var(--swan); border-bottom-width: 3px; border-radius: 6px; padding: 0 4px; color: var(--wolf); }
   `;
 
@@ -272,6 +308,14 @@
         <button class="tswitch" data-a="theme" type="button" role="switch" aria-checked="true">${THEME_SWITCH}</button>
         <button class="icon-btn" data-a="close" title="${esc(T('close.title'))}" data-i18n-title="close.title">✕</button></div>
       <div class="stale" hidden><span data-i18n="stale.msg">${esc(T('stale.msg'))}</span><button type="button" data-a="reload" data-i18n="stale.btn">${esc(T('stale.btn'))}</button></div>
+      <div class="updok" hidden><span></span><button type="button" data-a="updSeen" aria-label="OK">✕</button></div>
+      <div class="upd" hidden>
+        <div class="upd-h"><span class="upd-ic">${ICON_UP}</span><div><b>${tx('upd.title')}</b><div class="upd-v"></div></div></div>
+        <ul class="upd-notes"></ul>
+        <p class="upd-msg" hidden></p>
+        <button class="upd-guide" type="button" data-a="updGuide">${tx('upd.guide')}</button>
+        <div class="upd-btns"><button class="btn gold" data-a="updApply">${tx('upd.now')}</button><button class="btn ghost" data-a="updLater">${tx('upd.later')}</button></div>
+      </div>
       <div class="body">
         <div class="card">
           <div class="row"><div><h3 class="ttl">${tx('grind.title')}${info('help.grind')}</h3><div class="sub">${tx('grind.sub')}</div></div><button class="btn gold" data-a="grind">${tx('btn.start')}</button></div>
@@ -303,6 +347,7 @@
         <details class="card" data-a="log"><summary><h3 class="ttl">${tx('log.title')}${info('help.log')}</h3><button class="copy" data-a="copy" title="${esc(T('log.copyTitle'))}" data-i18n-title="log.copyTitle">${tx('log.copy')}</button></summary><pre></pre><div class="unk"></div></details>
       </div>
       <div class="keys"><span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> ${tx('key.solve')}</span><span><kbd>Alt</kbd>+<kbd>G</kbd> ${tx('key.grind')}</span><span><kbd>Alt</kbd>+<kbd>X</kbd> ${tx('key.stop')}</span><span><kbd>Alt</kbd>+<kbd>H</kbd> ${tx('key.hud')}</span></div>
+      <div class="updrow"><button class="updbtn" type="button" data-a="updCheck">${ICON_REFRESH}${tx('upd.check')}</button>${info('help.update')}<span class="upd-st"></span></div>
       <div class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span class="by">${tx('credit.by')}</span><a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a><span class="ver" data-s="ver"></span></div>
     </section>
     <div class="tip" role="tooltip" hidden></div>
@@ -420,6 +465,13 @@
     $('.fab').addEventListener('click', () => { if (!$('.fab').__moved) setOpen(true); $('.fab').__moved = false; });
     $('[data-a="close"]').addEventListener('click', () => setOpen(false));
     $('[data-a="reload"]').addEventListener('click', () => location.reload());
+    const toBridge = (type, data) => document.dispatchEvent(new CustomEvent('alp:out', { detail: { type, data } }));
+    $('[data-a="updCheck"]').addEventListener('click', () => { state.updStatus = 'checking'; render(); toBridge('updCheck'); });
+    $('[data-a="updApply"]').addEventListener('click', () => { state.updStatus = 'applying'; render(); toBridge('updApply'); });
+    $('[data-a="updLater"]').addEventListener('click', () => { state.upd.dismissed = state.upd.latest; state.updStatus = null; render(); toBridge('updDismiss', state.upd.latest); });
+    $('[data-a="updGuide"]').addEventListener('click', () => toBridge('openGuide', '#atualizar'));
+    $('[data-a="updSeen"]').addEventListener('click', () => { state.upd.justUpdated = null; render(); toBridge('updDismiss', state.upd.dismissed ?? null); });
+    $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.dismissed = null; render(); toBridge('updDismiss', null); });
     $('[data-a="theme"]').addEventListener('click', () => {
       const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
       setTheme(next);
@@ -563,6 +615,45 @@
     for (const f of $('.wrap').querySelectorAll('.flag')) f.classList.toggle('on', f.dataset.lang === I18N.lang);
     $('[data-s="ver"]').textContent = state.version ? '· v' + state.version : '';
     $('.unk').textContent = state.unknown.size ? T('unk', { list: [...state.unknown].join(', ') }) : '';
+    renderUpd();
+  };
+
+  // notas do Release (markdown simples) → até 6 itens curtos
+  const noteItems = (md) => String(md || '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
+    .filter((l) => l && !/^install\b/i.test(l) && !/^(download|open `chrome)/i.test(l))
+    .flatMap((l) => (l.length > 160 ? l.split(/(?<=[.!?])\s+/) : [l])).filter(Boolean).slice(0, 6);
+  const renderUpd = () => {
+    const u = state.upd || {}, st = state.updStatus;
+    const stat = typeof st === 'string' ? st : st?.status;
+    const show = !!u.available && u.dismissed !== u.latest;
+    $('.upd').hidden = !show;
+    $('.fab').classList.toggle('upd', !!u.available);
+    if (show) {
+      $('.upd-v').innerHTML = `v${esc(u.current || state.version || '?')} → <i>v${esc(u.latest)}</i>`;
+      const items = noteItems(u.notes);
+      $('.upd-notes').innerHTML = items.map((x) => `<li>${esc(x)}</li>`).join('');
+      $('.upd-notes').hidden = !items.length;
+      const msg = $('.upd-msg');
+      const m = stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest })
+        : stat === 'applying' ? T('upd.applying')
+        : st?.mode === 'store' && stat ? T('upd.storeWait')
+        : stat === 'error' ? T('upd.error') : '';
+      msg.textContent = m; msg.hidden = !m;
+      $('[data-a="updApply"]').disabled = stat === 'applying';
+    }
+    const ju = u.justUpdated;
+    const okBox = $('.updok');
+    okBox.hidden = !(ju && Date.now() - ju.at < 30 * 60e3);
+    if (!okBox.hidden) okBox.querySelector('span').textContent = T('upd.done', { from: ju.from || '?', to: ju.to });
+    const b = $('[data-a="updCheck"]');
+    b.classList.toggle('spin', stat === 'checking');
+    const s = $('.upd-st');
+    s.className = 'upd-st';
+    if (stat === 'checking') s.textContent = T('upd.checking');
+    else if (u.available) { s.textContent = T('upd.avail', { v: u.latest }); s.classList.add('new'); }
+    else if (stat === 'error' || (stat === 'none' && u.error)) s.textContent = T('upd.error');
+    else if (stat === 'none') s.textContent = T('upd.none');
+    else s.textContent = '';
   };
 
   let raf = 0;
@@ -584,6 +675,8 @@
       case 'config': break; // render relê API().cfg
       case 'theme': setTheme(data); return;
       case 'stale': state.stale = true; break;
+      case 'update': state.upd = { ...(data || {}) }; break;
+      case 'updResult': state.updStatus = data || null; break;
       default: return;
     }
     schedule();

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Midas · Como instalar</title>
+<style>
+  :root {
+    --bg: #131f24; --card: #1b2b33; --line: #37464f; --text: #f1f7fb; --muted: #9fb2bb;
+    --gold: #ffc800; --gold-dk: #cc9f00; --gold-ink: #3d2f00; --gold-text: #ffc800; --blue: #1cb0f6; --green: #58cc02; --red: #ff4b4b;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f7f7f7; --card: #ffffff; --line: #e1e1e1; --text: #2f2f2f; --muted: #6b6b6b; --gold-text: #9a6700; --blue: #0b78b3; }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 "Nunito", "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 16px 40px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  header svg.crown { width: 54px; height: 54px; flex: none; }
+  h1 { margin: 0; font-size: 30px; font-weight: 900; letter-spacing: .01em; }
+  .tag { margin: 2px 0 0; color: var(--muted); font-weight: 700; }
+  .langs { margin-left: auto; display: flex; gap: 8px; }
+  .flag { width: 30px; height: 21px; padding: 0; border: 0; border-radius: 5px; overflow: hidden; cursor: pointer; background: none;
+    opacity: .45; box-shadow: 0 0 0 2px var(--line); transition: opacity .15s, box-shadow .15s; }
+  .flag svg { width: 100%; height: 100%; display: block; }
+  .flag:hover { opacity: .85; } .flag.on { opacity: 1; box-shadow: 0 0 0 2.5px var(--gold); }
+  nav { display: flex; gap: 8px; flex-wrap: wrap; margin: 18px 0 6px; }
+  nav a { text-decoration: none; color: var(--blue); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .05em;
+    border: 2px solid var(--line); border-bottom-width: 4px; border-radius: 14px; padding: 7px 12px; background: var(--card); }
+  nav a:active { border-bottom-width: 2px; transform: translateY(2px); }
+  section { margin-top: 26px; }
+  h2 { font-size: 21px; font-weight: 900; margin: 0 0 12px; display: flex; align-items: center; gap: 10px; }
+  h2 .ic { width: 34px; height: 34px; border-radius: 11px; background: var(--gold); color: var(--gold-ink); display: grid; place-items: center;
+    box-shadow: 0 3px 0 var(--gold-dk); font-size: 17px; flex: none; }
+  ol.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; counter-reset: s; }
+  ol.steps li { counter-increment: s; position: relative; background: var(--card); border: 2px solid var(--line); border-bottom-width: 4px;
+    border-radius: 16px; padding: 14px 16px 14px 62px; }
+  ol.steps li::before { content: counter(s); position: absolute; left: 14px; top: 13px; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--gold); color: var(--gold-ink); display: grid; place-items: center; font-weight: 900; box-shadow: 0 3px 0 var(--gold-dk); }
+  ol.steps li > b { display: block; font-size: 16px; }
+  ol.steps p { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+  code, kbd { font: 700 13.5px ui-monospace, Consolas, monospace; background: rgba(127,127,127,.16); border-radius: 6px; padding: 1px 6px; color: var(--text); }
+  .box { background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-top: 12px; }
+  .box.tip { border-color: var(--blue); }
+  .box.warn { border-color: var(--gold); }
+  .box.danger { border-color: var(--red); }
+  .box h3 { margin: 0 0 6px; font-size: 15px; font-weight: 900; }
+  .box p, .box li { color: var(--muted); font-size: 15px; margin: 4px 0; }
+  .box ul { margin: 6px 0 0; padding-left: 20px; }
+  dl { margin: 0; display: grid; gap: 10px; }
+  dt { font-weight: 900; }
+  dd { margin: 2px 0 0; color: var(--muted); }
+  footer { margin-top: 34px; padding-top: 14px; border-top: 2px dashed var(--line); display: flex; align-items: center; justify-content: center; gap: 6px;
+    color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .03em; }
+  footer svg { width: 11px; height: 11px; fill: var(--gold); }
+  footer a { text-decoration: none; border-radius: 6px; padding: 1px 3px; }
+  footer a:hover { background: rgba(255,200,0,.12); }
+  footer b { font-weight: 900; font-size: 14px; letter-spacing: .06em; color: var(--gold-text); }
+  [data-l] { display: none; }
+  html[lang^="pt"] [data-l="pt"], html[lang^="en"] [data-l="en"], html[lang^="es"] [data-l="es"] { display: revert; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <svg class="crown" viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11l6 5 6-9 6 9 6-5-2.5 13h-19z" fill="#ffc800"/><path d="M6.5 24h19v3h-19z" fill="#ffc800" opacity=".75"/><circle cx="16" cy="6" r="2" fill="#ffc800"/><circle cx="3.5" cy="10" r="1.8" fill="#ffc800"/><circle cx="28.5" cy="10" r="1.8" fill="#ffc800"/></svg>
+    <div>
+      <h1>Midas</h1>
+      <p class="tag"><span data-l="pt">Como instalar e atualizar</span><span data-l="en">How to install and update</span><span data-l="es">Cómo instalar y actualizar</span></p>
+    </div>
+    <div class="langs" role="group" aria-label="Idioma / Language">
+      <button class="flag" data-lang="pt" title="Português" aria-label="Português"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.6 18.4 7 10 12.4 1.6 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.3" fill="#002776"/><path d="M6.9 6.2q3.3-.9 6.2.9" stroke="#fff" stroke-width=".7" fill="none"/></svg></button>
+      <button class="flag" data-lang="en" title="English" aria-label="English"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#fff"/><path d="M0 0h20v1.08H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20v1.07H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20V14H0z" fill="#b22234"/><rect width="9" height="7.54" fill="#3c3b6e"/></svg></button>
+      <button class="flag" data-lang="es" title="Español" aria-label="Español"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg></button>
+    </div>
+  </header>
+
+  <nav>
+    <a href="#instalar"><span data-l="pt">Instalar</span><span data-l="en">Install</span><span data-l="es">Instalar</span></a>
+    <a href="#atualizar"><span data-l="pt">Atualizar</span><span data-l="en">Update</span><span data-l="es">Actualizar</span></a>
+    <a href="#usar"><span data-l="pt">Primeiros passos</span><span data-l="en">First steps</span><span data-l="es">Primeros pasos</span></a>
+    <a href="#problemas"><span data-l="pt">Problemas</span><span data-l="en">Troubleshooting</span><span data-l="es">Problemas</span></a>
+  </nav>
+
+  <!-- ───────── INSTALAR ───────── -->
+  <section id="instalar">
+    <h2><span class="ic">1</span><span data-l="pt">Instalar (uma vez só)</span><span data-l="en">Install (once)</span><span data-l="es">Instalar (una sola vez)</span></h2>
+    <ol class="steps">
+      <li data-l="pt"><b>Extraia o zip numa pasta fixa</b><p>Clique com o botão direito no <code>midas-vX.Y.Z.zip</code> → <i>Extrair tudo</i>. Escolha um lugar que não vai mudar, por exemplo <code>Documentos\Midas</code>. <b>Não apague nem mova essa pasta depois</b>: o Chrome usa os arquivos dela.</p></li>
+      <li data-l="pt"><b>Abra as extensões do Chrome</b><p>Digite <code>chrome://extensions</code> na barra de endereço e aperte Enter.</p></li>
+      <li data-l="pt"><b>Ligue o “Modo do desenvolvedor”</b><p>É a chavinha no canto superior direito da página.</p></li>
+      <li data-l="pt"><b>Clique em “Carregar sem compactação”</b><p>Escolha a pasta que você extraiu: a que tem o arquivo <code>manifest.json</code> dentro.</p></li>
+      <li data-l="pt"><b>Abra o Duolingo</b><p>Entre em <code>duolingo.com</code> (ou recarregue a aba). A <b>coroa dourada</b> aparece no canto da tela: é o painel do Midas.</p></li>
+
+      <li data-l="en"><b>Extract the zip to a permanent folder</b><p>Right-click <code>midas-vX.Y.Z.zip</code> → <i>Extract All</i>. Pick a place that won't change, e.g. <code>Documents\Midas</code>. <b>Don't delete or move that folder later</b>: Chrome loads the extension from it.</p></li>
+      <li data-l="en"><b>Open Chrome's extensions page</b><p>Type <code>chrome://extensions</code> in the address bar and press Enter.</p></li>
+      <li data-l="en"><b>Turn on “Developer mode”</b><p>It's the toggle in the top-right corner.</p></li>
+      <li data-l="en"><b>Click “Load unpacked”</b><p>Pick the folder you extracted: the one with <code>manifest.json</code> inside.</p></li>
+      <li data-l="en"><b>Open Duolingo</b><p>Go to <code>duolingo.com</code> (or reload the tab). The <b>gold crown</b> shows up in the corner: that's the Midas panel.</p></li>
+
+      <li data-l="es"><b>Extrae el zip en una carpeta fija</b><p>Clic derecho en <code>midas-vX.Y.Z.zip</code> → <i>Extraer todo</i>. Elige un lugar que no vaya a cambiar, por ejemplo <code>Documentos\Midas</code>. <b>No borres ni muevas esa carpeta después</b>: Chrome usa sus archivos.</p></li>
+      <li data-l="es"><b>Abre las extensiones de Chrome</b><p>Escribe <code>chrome://extensions</code> en la barra de direcciones y pulsa Enter.</p></li>
+      <li data-l="es"><b>Activa el “Modo de desarrollador”</b><p>Es el interruptor de la esquina superior derecha.</p></li>
+      <li data-l="es"><b>Pulsa “Cargar descomprimida”</b><p>Elige la carpeta que extrajiste: la que tiene el archivo <code>manifest.json</code>.</p></li>
+      <li data-l="es"><b>Abre Duolingo</b><p>Entra en <code>duolingo.com</code> (o recarga la pestaña). La <b>corona dorada</b> aparece en la esquina: es el panel de Midas.</p></li>
+    </ol>
+  </section>
+
+  <!-- ───────── ATUALIZAR ───────── -->
+  <section id="atualizar">
+    <h2><span class="ic">2</span><span data-l="pt">Atualizar</span><span data-l="en">Update</span><span data-l="es">Actualizar</span></h2>
+    <ol class="steps">
+      <li data-l="pt"><b>O Midas avisa sozinho</b><p>Ele procura versão nova no GitHub ao abrir o Chrome e a cada 6 horas (ou na hora, no botão <i>Procurar atualização</i> do rodapé). Quando tem, aparece um <b>cartão dourado</b> mostrando o que mudou.</p></li>
+      <li data-l="pt"><b>Clique em “Atualizar”</b><p>O zip da versão nova é baixado (fica na pasta Downloads).</p></li>
+      <li data-l="pt"><b>Extraia por cima da mesma pasta</b><p>Extraia o zip novo <b>na mesma pasta</b> do passo 1 da instalação e confirme <i>Substituir os arquivos</i>.</p></li>
+      <li data-l="pt"><b>Pronto</b><p>Em até 1 minuto o Midas percebe os arquivos novos e se recarrega sozinho, junto com a aba do Duolingo. Se o Auto Grind estava rodando, ele continua. Ajustes e progresso não se perdem. Com pressa? Clique em ↻ no card do Midas em <code>chrome://extensions</code>.</p></li>
+
+      <li data-l="en"><b>Midas tells you</b><p>It looks for a new version on GitHub when Chrome starts and every 6 hours (or right away with the <i>Check for updates</i> button at the bottom). When there's one, a <b>gold card</b> shows what changed.</p></li>
+      <li data-l="en"><b>Click “Update”</b><p>The new version's zip is downloaded (to your Downloads folder).</p></li>
+      <li data-l="en"><b>Extract it over the same folder</b><p>Extract the new zip <b>into the same folder</b> from install step 1 and confirm <i>Replace the files</i>.</p></li>
+      <li data-l="en"><b>Done</b><p>Within a minute Midas notices the new files and reloads itself, together with the Duolingo tab. If Auto Grind was running, it keeps going. Settings and progress are kept. In a hurry? Click ↻ on the Midas card in <code>chrome://extensions</code>.</p></li>
+
+      <li data-l="es"><b>Midas te avisa</b><p>Busca una versión nueva en GitHub al abrir Chrome y cada 6 horas (o al momento, con el botón <i>Buscar actualización</i> del pie). Cuando hay una, aparece una <b>tarjeta dorada</b> con lo que cambió.</p></li>
+      <li data-l="es"><b>Pulsa “Actualizar”</b><p>Se descarga el zip de la versión nueva (a tu carpeta de Descargas).</p></li>
+      <li data-l="es"><b>Extráelo sobre la misma carpeta</b><p>Extrae el zip nuevo <b>en la misma carpeta</b> del paso 1 de la instalación y confirma <i>Reemplazar los archivos</i>.</p></li>
+      <li data-l="es"><b>Listo</b><p>En menos de un minuto Midas detecta los archivos nuevos y se recarga solo, junto con la pestaña de Duolingo. Si el Auto Grind estaba en marcha, sigue. Los ajustes y el progreso se mantienen. ¿Con prisa? Pulsa ↻ en la tarjeta de Midas en <code>chrome://extensions</code>.</p></li>
+    </ol>
+  </section>
+
+  <!-- ───────── USAR ───────── -->
+  <section id="usar">
+    <h2><span class="ic">3</span><span data-l="pt">Primeiros passos</span><span data-l="en">First steps</span><span data-l="es">Primeros pasos</span></h2>
+    <div class="box" data-l="pt"><ul>
+      <li>Clique na <b>coroa</b> para abrir o painel. <kbd>Alt</kbd>+<kbd>H</kbd> mostra ou esconde.</li>
+      <li><b>Auto Grind</b> → <i>Iniciar</i>: faz as lições que faltam e depois leva cada nó do caminho até as Titãs. Ele só para quando você clica em <i>Parar</i>.</li>
+      <li><b>Velocidade</b>: <i>Rage</i> é o mais rápido; <i>Legit</i> espera uns segundos entre ações, como uma pessoa.</li>
+      <li>Passe o mouse nos <b>“i”</b> para ver o que cada coisa faz.</li>
+    </ul></div>
+    <div class="box" data-l="en"><ul>
+      <li>Click the <b>crown</b> to open the panel. <kbd>Alt</kbd>+<kbd>H</kbd> shows or hides it.</li>
+      <li><b>Auto Grind</b> → <i>Start</i>: finishes the lessons you haven't done, then takes every node on your path to Legendary. It only stops when you click <i>Stop</i>.</li>
+      <li><b>Speed</b>: <i>Rage</i> is the fastest; <i>Legit</i> waits a few seconds between actions, like a person.</li>
+      <li>Hover the <b>“i”</b> buttons to see what each thing does.</li>
+    </ul></div>
+    <div class="box" data-l="es"><ul>
+      <li>Pulsa la <b>corona</b> para abrir el panel. <kbd>Alt</kbd>+<kbd>H</kbd> lo muestra u oculta.</li>
+      <li><b>Auto Grind</b> → <i>Iniciar</i>: hace las lecciones que faltan y luego lleva cada nodo del camino a Leyenda. Solo se detiene cuando pulsas <i>Parar</i>.</li>
+      <li><b>Velocidad</b>: <i>Rage</i> es lo más rápido; <i>Legit</i> espera unos segundos entre acciones, como una persona.</li>
+      <li>Pasa el ratón por los <b>“i”</b> para ver qué hace cada cosa.</li>
+    </ul></div>
+  </section>
+
+  <!-- ───────── PROBLEMAS ───────── -->
+  <section id="problemas">
+    <h2><span class="ic">?</span><span data-l="pt">Problemas comuns</span><span data-l="en">Troubleshooting</span><span data-l="es">Problemas comunes</span></h2>
+    <div class="box tip" data-l="pt"><dl>
+      <dt>A coroa não aparece</dt><dd>Recarregue a aba do Duolingo (F5). Confira em <code>chrome://extensions</code> se o Midas está ligado.</dd>
+      <dt>“Não foi possível carregar o manifesto”</dt><dd>Você escolheu a pasta errada. Escolha a pasta que tem o <code>manifest.json</code> direto dentro dela (não a pasta de fora).</dd>
+      <dt>Aviso de “extensões no modo do desenvolvedor”</dt><dd>É normal para extensões instaladas por pasta. Pode fechar o aviso; não desative o Midas.</dd>
+      <dt>O grind ficou lento</dt><dd>Deixe a aba do Duolingo visível, numa janela própria. O Chrome freia abas escondidas.</dd>
+      <dt>Algo travou</dt><dd>Abra o <b>Log</b> no painel, clique em <i>Copiar</i> e mande para quem te passou o Midas.</dd>
+    </dl></div>
+    <div class="box tip" data-l="en"><dl>
+      <dt>The crown doesn't show up</dt><dd>Reload the Duolingo tab (F5). Check in <code>chrome://extensions</code> that Midas is turned on.</dd>
+      <dt>“Manifest file is missing or unreadable”</dt><dd>You picked the wrong folder. Pick the one with <code>manifest.json</code> directly inside (not the outer folder).</dd>
+      <dt>“Disable developer mode extensions” warning</dt><dd>Normal for extensions installed from a folder. Close it; don't disable Midas.</dd>
+      <dt>The grind got slow</dt><dd>Keep the Duolingo tab visible, in its own window. Chrome throttles hidden tabs.</dd>
+      <dt>Something got stuck</dt><dd>Open the <b>Log</b> in the panel, click <i>Copy</i> and send it to whoever shared Midas with you.</dd>
+    </dl></div>
+    <div class="box tip" data-l="es"><dl>
+      <dt>La corona no aparece</dt><dd>Recarga la pestaña de Duolingo (F5). Revisa en <code>chrome://extensions</code> que Midas esté activado.</dd>
+      <dt>“No se pudo cargar el manifiesto”</dt><dd>Elegiste la carpeta equivocada. Elige la que tiene <code>manifest.json</code> directamente dentro (no la carpeta de fuera).</dd>
+      <dt>Aviso de “extensiones en modo desarrollador”</dt><dd>Es normal en extensiones instaladas desde una carpeta. Ciérralo; no desactives Midas.</dd>
+      <dt>El grind va lento</dt><dd>Deja la pestaña de Duolingo visible, en su propia ventana. Chrome frena las pestañas ocultas.</dd>
+      <dt>Algo se trabó</dt><dd>Abre el <b>Log</b> en el panel, pulsa <i>Copiar</i> y envíalo a quien te pasó Midas.</dd>
+    </dl></div>
+    <div class="box danger" data-l="pt"><h3>Use por sua conta e risco</h3><p>Automatizar o Duolingo vai contra os termos de uso dele e pode levar a punição ou banimento da conta.</p></div>
+    <div class="box danger" data-l="en"><h3>Use at your own risk</h3><p>Automating Duolingo goes against its terms of service and may get your account penalized or banned.</p></div>
+    <div class="box danger" data-l="es"><h3>Úsalo bajo tu propio riesgo</h3><p>Automatizar Duolingo va contra sus términos de uso y puede llevar a sanciones o al bloqueo de la cuenta.</p></div>
+  </section>
+
+  <footer>
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg>
+    <span data-l="pt">feito por</span><span data-l="en">made by</span><span data-l="es">hecho por</span>
+    <a href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a>
+    <span id="ver">· v0.13.1</span>
+  </footer>
+</div>
+<script src="guia/guia.js"></script>
+</body>
+</html>

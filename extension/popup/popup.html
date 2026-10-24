@@ -15,6 +15,15 @@
     <button id="theme" class="tswitch" type="button" role="switch" aria-checked="true"><svg class="ic sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.8"/><g stroke-width="2.4" stroke-linecap="round"><path d="M12 1.6v2.8M12 19.6v2.8M1.6 12h2.8M19.6 12h2.8M4.6 4.6l2 2M17.4 17.4l2 2M4.6 19.4l2-2M17.4 6.6l2-2"/></g></svg><svg class="ic moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg><span class="knob"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.8"/><g stroke-width="2.4" stroke-linecap="round"><path d="M12 1.6v2.8M12 19.6v2.8M1.6 12h2.8M19.6 12h2.8M4.6 4.6l2 2M17.4 17.4l2 2M4.6 19.4l2-2M17.4 6.6l2-2"/></g></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a.6.6 0 0 0-.8-.7A9.5 9.5 0 1 0 21.2 15.4a.6.6 0 0 0-.7-.8z"/></svg></span></button><div class="langs" role="group" aria-label="Idioma / Language"><button class="flag" data-lang="pt" title="Português" aria-label="Português"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#009c3b"/><path d="M10 1.6 18.4 7 10 12.4 1.6 7z" fill="#ffdf00"/><circle cx="10" cy="7" r="3.3" fill="#002776"/><path d="M6.9 6.2q3.3-.9 6.2.9" stroke="#fff" stroke-width=".7" fill="none"/></svg></button><button class="flag" data-lang="en" title="English" aria-label="English"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#fff"/><path d="M0 0h20v1.08H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20v1.07H0zm0 2.15h20v1.08H0zm0 2.15h20v1.08H0zm0 2.16h20V14H0z" fill="#b22234"/><rect width="9" height="7.54" fill="#3c3b6e"/><g fill="#fff"><circle cx="1.6" cy="1.4" r=".45"/><circle cx="3.6" cy="1.4" r=".45"/><circle cx="5.6" cy="1.4" r=".45"/><circle cx="7.6" cy="1.4" r=".45"/><circle cx="2.6" cy="2.9" r=".45"/><circle cx="4.6" cy="2.9" r=".45"/><circle cx="6.6" cy="2.9" r=".45"/><circle cx="1.6" cy="4.4" r=".45"/><circle cx="3.6" cy="4.4" r=".45"/><circle cx="5.6" cy="4.4" r=".45"/><circle cx="7.6" cy="4.4" r=".45"/><circle cx="2.6" cy="5.9" r=".45"/><circle cx="4.6" cy="5.9" r=".45"/><circle cx="6.6" cy="5.9" r=".45"/></g></svg></button><button class="flag" data-lang="es" title="Español" aria-label="Español"><svg viewBox="0 0 20 14" aria-hidden="true"><rect width="20" height="14" fill="#aa151b"/><rect y="3.5" width="20" height="7" fill="#f1bf00"/></svg></button></div>
   </header>
 
+  <div id="updok" class="updok" hidden><span id="updok-t"></span><button id="upd-seen" type="button" aria-label="OK">✕</button></div>
+  <section id="upd" class="card upd" hidden>
+    <div class="upd-h"><span class="upd-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 7h-4.5v6h-5v-6H5z"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg></span><div><b data-i18n="upd.title"></b><div id="upd-v" class="upd-v"></div></div></div>
+    <ul id="upd-notes" class="upd-notes"></ul>
+    <p id="upd-msg" class="upd-msg" hidden></p>
+    <button id="upd-guide" class="upd-guide" type="button" data-i18n="upd.guide"></button>
+    <div class="upd-btns"><button id="upd-apply" class="primary" data-i18n="upd.now"></button><button id="upd-later" data-i18n="upd.later"></button></div>
+  </section>
+
   <section class="card">
     <div class="row between">
       <h2 class="ttl"><span data-i18n="grind.title"></span><button class="info" data-help="help.grind">i</button></h2>
@@ -56,6 +65,7 @@
   <footer class="muted small">
     <span data-i18n="pop.footer1"></span><br>
     <span data-i18n="pop.footer2"></span>
+    <span class="updrow"><button id="upd-check" class="updbtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.3A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.3A10 10 0 0 0 22 12z"/></svg><span data-i18n="upd.check"></span></button><button class="info" data-help="help.update">i</button><span id="upd-st" class="upd-st"></span></span>
     <span class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span data-i18n="credit.by"></span> <a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a> <span id="ver"></span></span>
   </footer>
   <div id="tip" class="tip" role="tooltip" hidden></div>

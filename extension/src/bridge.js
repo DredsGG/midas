@@ -35,6 +35,16 @@
   chrome.storage.onChanged.addListener((ch) => {
     if (ch.alp_lang?.newValue) send('lang', ch.alp_lang.newValue);
     if (ch.alp_theme?.newValue) send('theme', ch.alp_theme.newValue);
+    if (ch.alp_update?.newValue) toHud('update', ch.alp_update.newValue);
+  });
+
+  // v0.13.0: atualizações (o service worker procura no GitHub; aqui só leva e traz para a HUD)
+  const toHud = (type, data) => document.dispatchEvent(new CustomEvent('alp:out', { detail: { type, data } }));
+  const pushUpdate = safe(async () => {
+    const { alp_update } = await chrome.storage.local.get('alp_update');
+    toHud('update', alp_update || {});
+    // a HUD abriu e a última procura tem mais de 1 h: procura de novo
+    if (!alp_update?.checkedAt || Date.now() - alp_update.checkedAt > 3600e3) chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => {});
   });
 
   // v0.12.9: uma aba só roda o grind. Cada aba tem um id que sobrevive ao reload
@@ -104,6 +114,28 @@
         await pushLang();
         await hydrate();
         await maybeResume();
+        await pushUpdate();
+        break;
+      }
+      case 'updCheck': {
+        toHud('updResult', { status: 'checking' });
+        const st = await chrome.runtime.sendMessage({ cmd: 'updCheck' });
+        toHud('updResult', { status: st?.error ? 'error' : st?.available ? 'available' : 'none', st });
+        break;
+      }
+      case 'updApply': {
+        toHud('updResult', { status: 'applying' });
+        const r = await chrome.runtime.sendMessage({ cmd: 'updApply' });
+        toHud('updResult', r || { status: 'error' });
+        break;
+      }
+      case 'openGuide': {
+        await chrome.runtime.sendMessage({ cmd: 'openGuide', hash: data || '' });
+        break;
+      }
+      case 'updDismiss': {
+        const { alp_update = {} } = await chrome.storage.local.get('alp_update');
+        await chrome.storage.local.set({ alp_update: { ...alp_update, dismissed: data ?? null, justUpdated: null } });
         break;
       }
       case 'saveTheme': {

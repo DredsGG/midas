@@ -61,8 +61,50 @@ const render = (st) => {
   $('unknown').textContent = unk.length ? T('unk', { list: unk.join(', ') }) : '';
 };
 
-const refresh = async () =>
-  render(await chrome.storage.local.get(['alp_running', 'alp_progress', 'alp_log', 'alp_unknown']));
+// ───────── atualização (v0.13.0) ─────────
+let upd = {}, updStatus = null;
+const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const noteItems = (md) => String(md || '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
+  .filter((l) => l && !/^install\b/i.test(l) && !/^(download|open `chrome)/i.test(l))
+  .flatMap((l) => (l.length > 160 ? l.split(/(?<=[.!?])\s+/) : [l])).filter(Boolean).slice(0, 6);
+const renderUpd = () => {
+  const u = upd || {}, st = updStatus;
+  const stat = typeof st === 'string' ? st : st?.status;
+  const show = !!u.available && u.dismissed !== u.latest;
+  $('upd').hidden = !show;
+  if (show) {
+    $('upd-v').innerHTML = `v${esc(u.current || chrome.runtime.getManifest().version)} → <i>v${esc(u.latest)}</i>`;
+    const items = noteItems(u.notes);
+    $('upd-notes').innerHTML = items.map((x) => `<li>${esc(x)}</li>`).join('');
+    $('upd-notes').hidden = !items.length;
+    const m = stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest }) : stat === 'applying' ? T('upd.applying')
+      : st?.mode === 'store' && stat ? T('upd.storeWait') : stat === 'error' ? T('upd.error') : '';
+    $('upd-msg').textContent = m; $('upd-msg').hidden = !m;
+    $('upd-apply').disabled = stat === 'applying';
+  }
+  const ju = u.justUpdated;
+  $('updok').hidden = !(ju && Date.now() - ju.at < 30 * 60e3);
+  if (!$('updok').hidden) $('updok-t').textContent = T('upd.done', { from: ju.from || '?', to: ju.to });
+  $('upd-check').classList.toggle('spin', stat === 'checking');
+  const s = $('upd-st');
+  s.className = 'upd-st';
+  if (stat === 'checking') s.textContent = T('upd.checking');
+  else if (u.available) { s.textContent = T('upd.avail', { v: u.latest }); s.classList.add('new'); }
+  else if (stat === 'error' || (stat === 'none' && u.error)) s.textContent = T('upd.error');
+  else if (stat === 'none') s.textContent = T('upd.none');
+  else s.textContent = '';
+};
+const setDismissed = async (v, clearJust) => {
+  const { alp_update = {} } = await chrome.storage.local.get('alp_update');
+  await chrome.storage.local.set({ alp_update: { ...alp_update, dismissed: v, ...(clearJust ? { justUpdated: null } : {}) } });
+};
+
+const refresh = async () => {
+  const st = await chrome.storage.local.get(['alp_running', 'alp_progress', 'alp_log', 'alp_unknown', 'alp_update']);
+  render(st);
+  upd = st.alp_update || {};
+  renderUpd();
+};
 
 // textos fixos + balões de ajuda
 const applyI18n = () => {
@@ -159,6 +201,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => send(b.dataset.cmd)));
 
+  $('upd-check').addEventListener('click', async () => {
+    updStatus = 'checking'; renderUpd();
+    const r = await chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => null);
+    updStatus = !r || r.error ? 'error' : r.available ? 'available' : 'none';
+    await refresh();
+  });
+  $('upd-apply').addEventListener('click', async () => {
+    updStatus = 'applying'; renderUpd();
+    updStatus = (await chrome.runtime.sendMessage({ cmd: 'updApply' }).catch(() => null)) || 'error';
+    renderUpd();
+  });
+  $('upd-guide').addEventListener('click', () => chrome.runtime.sendMessage({ cmd: 'openGuide', hash: '#atualizar' }).catch(() => {}));
+  $('upd-later').addEventListener('click', () => setDismissed(upd.latest ?? null));
+  $('upd-seen').addEventListener('click', () => setDismissed(upd.dismissed ?? null, true));
+  $('upd-st').addEventListener('click', () => { if (upd.available) setDismissed(null); });
+
   chrome.storage.onChanged.addListener(refresh);
-  refresh();
+  await refresh();
+  // popup aberto e a última procura tem mais de 1 h: procura de novo em segundo plano
+  if (!upd.checkedAt || Date.now() - upd.checkedAt > 3600e3) chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => {});
 });

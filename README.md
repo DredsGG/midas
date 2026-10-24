@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.12.10-f5b301)
+![Version](https://img.shields.io/badge/version-0.13.1-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/midas-popup.png" width="380" alt="Midas popup: Auto Grind progress, current lesson controls and speed presets">
@@ -40,12 +40,16 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 
 ## Install
 
-1. Download **midas-vX.Y.Z.zip** from the [latest release](https://github.com/DredsGG/midas/releases/latest).
-2. Open `chrome://extensions` and turn on **Developer mode**.
-3. Drag the zip onto the page (or unzip it and use **Load unpacked**). From a clone of this repo, load the `extension/` folder.
+1. Download **midas-vX.Y.Z.zip** from the [latest release](https://github.com/DredsGG/midas/releases/latest) and extract it to a folder you'll keep (e.g. `Documents\Midas`). Don't move or delete it later: Chrome loads the extension from it.
+2. Open **`COMO-INSTALAR.html`** in that folder for the illustrated guide (Portuguese, English, Spanish), or:
+3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the folder that has `manifest.json`. From a clone of this repo, load the `extension/` folder.
 4. Open (or reload) duolingo.com.
 
 Keep Duolingo in its **own visible window** while grinding: Chrome throttles timers in background tabs and the grind slows down a lot.
+
+## Updates
+
+Midas checks this repo's releases when Chrome starts, every 6 hours and when you press **Check for updates** (bottom of the HUD and the popup). When there's a new version, a gold card shows what changed. Click **Update** to download the zip, extract it **over the same folder**, and within a minute Midas notices the new files and reloads itself together with the Duolingo tab; a running Auto Grind keeps going.
 
 ## How it's built
 
@@ -56,7 +60,8 @@ extension/
 ├── src/hud.js         MAIN world: in-page HUD (closed shadow DOM)
 ├── src/bridge.js      ISOLATED world: chrome.storage ⇄ page via CustomEvent
 ├── src/i18n.js        PT / EN / ES strings
-├── src/background.js  toolbar badge + reloads open Duolingo tabs after an update
+├── src/background.js  toolbar badge, update checks, reloads itself when new files land
+├── COMO-INSTALAR.html install / update guide (PT / EN / ES), guia/guia.js
 └── popup/             toolbar popup
 ```
 
