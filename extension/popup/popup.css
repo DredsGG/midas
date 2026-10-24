@@ -163,3 +163,6 @@ html[data-theme="light"] .upd-v i, html[data-theme="light"] .upd-st.new { color:
 html[data-theme="light"] .updok button, html[data-theme="light"] .updbtn { background: transparent; }
 .upd-guide { margin-top: 8px; padding: 0; border: 0; background: none !important; color: #1cb0f6; font-weight: 800; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 html[data-theme="light"] .upd-guide { color: #0b78b3; }
+
+/* v0.13.5: o atributo hidden vence o display das caixas (.updok tem display:flex) */
+[hidden] { display: none !important; }
