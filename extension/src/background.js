@@ -122,6 +122,9 @@ chrome.runtime.onInstalled.addListener(async (d) => {
   if (d.reason === 'update') {
     // aviso "atualizado para vX" na HUD/popup + versão nova já conferida no GitHub
     await saveUpdate({ justUpdated: { from: d.previousVersion || null, to: current(), at: Date.now() }, available: false, current: current() });
+    // versão nova pode resolver o que fez um nó ser pulado: retenta todos os pulados
+    const { alp_grind } = await chrome.storage.local.get('alp_grind');
+    if (alp_grind) await chrome.storage.local.set({ alp_grind: { ...alp_grind, skip: {} } });
     // as abas do Duolingo abertas ainda rodam a versão antiga, sem conexão com a extensão:
     // recarregar põe a nova; o Auto Grind retoma sozinho (alp_grind.active fica salvo)
     const tabs = await chrome.tabs.query({ url: 'https://www.duolingo.com/*' });

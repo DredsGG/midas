@@ -64,7 +64,7 @@ const render = (st) => {
 // ───────── atualização (v0.13.0) ─────────
 let upd = {}, updStatus = null;
 const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const noteItems = (md) => String(md || '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
+const noteItems = (md) => String(md || '').replace(/^\s*###\s*Install[\s\S]*?\n\s*\n\s*\n/i, '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
   .filter((l) => l && !/^install\b/i.test(l) && !/^(download|open `chrome)/i.test(l))
   .flatMap((l) => (l.length > 160 ? l.split(/(?<=[.!?])\s+/) : [l])).filter(Boolean).slice(0, 6);
 const renderUpd = () => {

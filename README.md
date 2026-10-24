@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.13.1-f5b301)
+![Version](https://img.shields.io/badge/version-0.13.3-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/midas-popup.png" width="380" alt="Midas popup: Auto Grind progress, current lesson controls and speed presets">

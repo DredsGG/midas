@@ -1011,13 +1011,17 @@
       pressNext();
       return 'chest';
     }
-    if (node.tagName === 'BUTTON') node.click();
-    else clickEl(node.firstElementChild) || node.firstElementChild?.click();
-    let btn = null;
-    for (let i = 0; i < 20 && !btn; i++) {
-      await sleep(150);
-      btn = $('[data-test^="skill-path-state-active"]') ||
-        $$('a, button').find((b) => /^(começar|start|iniciar)/i.test(norm(b.textContent)));
+    // v0.13.2: o Duolingo às vezes já deixa o balão "Começar" do nó ativo aberto (ex.: ao voltar
+    // de uma lição). Clicar no nó de novo FECHAVA o balão → "não consegui abrir o nó ativo" ×3 →
+    // grind travado. Agora: se o balão já está aberto, usa; senão clica no nó; se não abriu,
+    // clica de novo (alterna) até 3 vezes.
+    const startBtn = () => $('[data-test^="skill-path-state-active"]') ||
+      $$('a, button').find((b) => isVisible(b) && /^(começar|start|iniciar|comenzar|empezar)/i.test(norm(b.textContent)));
+    let btn = startBtn();
+    for (let tries = 0; tries < 3 && !btn; tries++) {
+      if (node.tagName === 'BUTTON') node.click();
+      else clickEl(node.firstElementChild) || node.firstElementChild?.click();
+      for (let i = 0; i < 14 && !btn; i++) { await sleep(150); btn = startBtn(); }
     }
     if (!btn) return false;
     btn.click();
@@ -1143,7 +1147,9 @@
       // e continua sozinho depois do reload
       if (Date.now() - grindState.startedAt > RELOAD_EVERY_MS) {
         report(T('log.hourlyReload'));
-        emit('reloading', { fresh: false });
+        // v0.13.2: zera a lista de pulos — nó pulado (ex.: Titã que falhou 2x) não fica para trás
+        // até o fim do caminho; volta a ser tentado pelo menos 1 vez por hora
+        emit('reloading', { fresh: true });
         await sleep(60000); // a ponte recarrega; se não recarregar, segue o grind
         grindState.startedAt = Date.now();
       }

@@ -619,7 +619,7 @@
   };
 
   // notas do Release (markdown simples) → até 6 itens curtos
-  const noteItems = (md) => String(md || '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
+  const noteItems = (md) => String(md || '').replace(/^\s*###\s*Install[\s\S]*?\n\s*\n\s*\n/i, '').split(/\r?\n/).map((l) => l.replace(/^\s*(#+|[-*+]|\d+\.)\s*/, '').replace(/[*_`]/g, '').trim())
     .filter((l) => l && !/^install\b/i.test(l) && !/^(download|open `chrome)/i.test(l))
     .flatMap((l) => (l.length > 160 ? l.split(/(?<=[.!?])\s+/) : [l])).filter(Boolean).slice(0, 6);
   const renderUpd = () => {
