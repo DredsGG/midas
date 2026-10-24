@@ -144,10 +144,33 @@
   // 400/503 no POST /sessions — nem o clique manual funciona. Detecta na hora para
   // o grind pular em vez de ficar parado esperando.
   let lastSessionError = null;
+  // v0.13.4: Titãs da prática "Spaced Repetition". O site do Duolingo pede a sessão
+  // LEGENDARY_LEXEME_PRACTICE com skillIds VAZIO (bug do próprio site → 400; o app do celular
+  // manda certo). Aqui o pedido é completado com os spacedRepetitionSkillIds do nó → 200 e a
+  // Titã credita (testado: unidade 144 inteira ficou dourada). srOverride vem do grind;
+  // srByPath (unidade|nó → ids) cobre o clique manual em "Titãs" na rota /lesson/unit/U/legendary/N.
+  let srOverride = null;
+  const srByPath = new Map();
+  const fixSrBody = (init) => {
+    try {
+      if (!init || typeof init.body !== 'string') return init;
+      const b = JSON.parse(init.body);
+      if (b?.type !== 'LEGENDARY_LEXEME_PRACTICE' || (Array.isArray(b.skillIds) && b.skillIds.length)) return init;
+      const m = location.pathname.match(/\/lesson\/unit\/(\d+)\/legendary\/(\d+)/);
+      const ids = srOverride || (m && srByPath.get(`${m[1]}|${m[2]}`));
+      if (!ids?.length) return init;
+      b.skillIds = ids;
+      return { ...init, body: JSON.stringify(b) };
+    } catch { return init; }
+  };
   try {
     const origFetch = window.fetch;
     window.fetch = async function (input, init) {
-      const res = await origFetch.apply(this, arguments);
+      try {
+        const u = typeof input === 'string' ? input : input?.url || '';
+        if (/\/sessions(\?|$)/.test(u) && String(init?.method || '').toUpperCase() === 'POST') init = fixSrBody(init);
+      } catch { /* ignora */ }
+      const res = await origFetch.call(this, input, init);
       try {
         const url = typeof input === 'string' ? input : input?.url || '';
         const method = String(init?.method || input?.method || 'GET').toUpperCase();
@@ -1033,7 +1056,23 @@
   // Prática "Spaced Repetition": o site do Duolingo não aceita Titãs nela. O POST da
   // sessão sai sem skills e volta 400/503 até no clique manual; no curso de inglês
   // eram 0 douradas de 525 (2026-10-19). Fica fora da fila e é contada à parte.
-  const isBlockedByDuolingo = (l) => l.type === 'practice' && /^spaced repetition/i.test(l.debugName || '');
+  // v0.13.4: com o skillIds completado no pedido (fixSrBody) ela aceita Titã; nada mais fica bloqueado
+  const isSpacedRep = (l) => l.type === 'practice' && /^spaced repetition/i.test(l.debugName || '');
+  const isBlockedByDuolingo = () => false;
+  // ids da prática Spaced Repetition (pathLevelClientData), buscados uma vez e guardados por id do nó
+  const srIds = new Map();
+  const loadSrIds = async () => {
+    const fields = 'currentCourse{pathSectioned{units{unitIndex,levels{id,type,pathLevelClientData}}}}';
+    const j = await api(`/2023-05-23/users/${userId()}?fields=${encodeURIComponent(fields)}`);
+    for (const sec of j.currentCourse?.pathSectioned || []) for (const u of sec.units || []) (u.levels || []).forEach((l, li) => {
+      const ids = l.pathLevelClientData?.spacedRepetitionSkillIds;
+      if (l.type === 'practice' && ids?.length) { srIds.set(l.id, ids); srByPath.set(`${u.unitIndex + 1}|${li + 1}`, ids); }
+    });
+  };
+  const srIdsFor = async (lv) => {
+    if (!srIds.has(lv.id)) { try { await loadSrIds(); } catch { /* sem ids: o pedido sai como o site manda */ } }
+    return srIds.get(lv.id) || null;
+  };
   const isEligible = (l) => LEGEND_TYPES.has(l.type) && !isBlockedByDuolingo(l);
   const grindState = { skip: {}, attempts: {}, done: 0, startedAt: 0 };
 
@@ -1191,9 +1230,11 @@
           grindState.skip[lv.id] = 'section-not-loaded';
           continue;
         }
+        srOverride = isSpacedRep(lv) ? await srIdsFor(lv) : null;
         await go(legendaryPath(lv));
       }
       const r = started === 'chest' ? 'chest' : await runSession(token);
+      srOverride = null;
       if (token.stop) break;
       if (r === 'reload') {
         emit('reloading', { fresh: false });
@@ -1348,6 +1389,7 @@
   (async () => {
     await sleep(1500);
     refreshProgress(true);
+    setTimeout(() => loadSrIds().catch(() => {}), 4000); // ids da Spaced Repetition para o clique manual em "Titãs"
     let lastPath = location.pathname, lastTick = Date.now();
     for (;;) {
       await sleep(1000);
