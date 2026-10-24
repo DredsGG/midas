@@ -77,7 +77,6 @@ Measured on a live account: a Legendary skill went 17/17 with no mistakes in abo
 ### Known limits
 
 - `speak`, `characterTrace` and `characterWrite` challenges are skipped (in Legendary a skip counts as a mistake).
-- Spaced-repetition practice can't be done in Legendary on the web, so it's counted separately.
 
 ## Credits
 
