@@ -58,7 +58,11 @@
     return !!alp_lock && alp_lock.id !== tabId && Date.now() - alp_lock.at < LOCK_TTL;
   };
   let beat = null, beatStart = 0;
-  const holdLock = safe(async () => { await chrome.storage.local.set({ alp_lock: { id: tabId, at: Date.now() } }); });
+  const holdLock = safe(async () => {
+    await chrome.storage.local.set({ alp_lock: { id: tabId, at: Date.now() } });
+    // v0.13.6: sinal de vida para a sentinela do service worker (recarrega a aba se ela congelar)
+    chrome.runtime.sendMessage({ cmd: 'beat' }).catch(() => {});
+  });
   const startBeat = () => { if (!beat) { beatStart = Date.now(); holdLock(); beat = setInterval(holdLock, 10000); } };
   const stopBeat = safe(async () => {
     if (beat) { clearInterval(beat); beat = null; }
@@ -80,7 +84,12 @@
   const maybeResume = safe(async () => {
     if (resumed) return;
     resumed = true;
-    const { alp_grind } = await chrome.storage.local.get('alp_grind');
+    const { alp_grind, alp_watch } = await chrome.storage.local.get(['alp_grind', 'alp_watch']);
+    // a sentinela recarregou esta aba porque ela congelou: registra no log
+    if (alp_watch?.at && Date.now() - alp_watch.at < 180000) {
+      await chrome.storage.local.remove('alp_watch');
+      setTimeout(() => send('note', alp_watch.reason === 'frozen' ? 'frozen' : 'watchdog'), 2000);
+    }
     if (alp_grind?.active) {
       setTimeout(safe(async () => {
         if (await otherTabRunning()) { send('note', 'otherTab'); return; }

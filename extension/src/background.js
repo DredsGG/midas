@@ -96,16 +96,64 @@ const watchDisk = async () => {
   } catch { /* manifest no meio da gravação: tenta no próximo minuto */ }
 };
 
+// v0.13.6 — sentinela: a aba do grind manda um sinal de vida a cada 10 s (alp_beat). Se a
+// página congelar (o Chrome para de responder, nem o reinício de 1 h roda), o sinal some;
+// depois de 4 min sem sinal com o grind ligado, recarrega a aba. Se nem isso adiantar,
+// fecha a aba travada e abre outra no /learn (o grind retoma sozinho).
+const STALE_MS = 4 * 60e3;
+const watchGrind = async () => {
+  const { alp_grind, alp_beat, alp_lock } = await chrome.storage.local.get(['alp_grind', 'alp_beat', 'alp_lock']);
+  // grind parado de propósito (ou que terminou sozinho) solta o alp_lock; aba congelada não solta
+  if (!alp_grind?.active || !alp_beat?.tabId || !alp_lock) return;
+  try { if ((await chrome.tabs.get(alp_beat.tabId)).frozen) return onFrozen(alp_beat.tabId); } catch { /* aba fechada: segue abaixo */ }
+  if (Date.now() - alp_beat.at < STALE_MS) return;
+  if (alp_beat.kickAt && Date.now() - alp_beat.kickAt < STALE_MS) return; // espera a última ação surtir efeito
+  let tab = null;
+  try { tab = await chrome.tabs.get(alp_beat.tabId); } catch { /* aba fechada */ }
+  if (!tab || !/^https:\/\/www\.duolingo\.com\//.test(tab.url || tab.pendingUrl || '')) {
+    await chrome.storage.local.remove('alp_beat'); // fecharam a aba ou saíram do Duolingo: não insiste
+    return;
+  }
+  const kicks = (alp_beat.kicks || 0) + 1;
+  await chrome.storage.local.set({ alp_beat: { ...alp_beat, kickAt: Date.now(), kicks }, alp_watch: { at: Date.now(), kicks } });
+  if (kicks === 1) {
+    await chrome.tabs.reload(tab.id, { bypassCache: true }).catch(() => {});
+  } else {
+    await chrome.tabs.create({ url: 'https://www.duolingo.com/learn', windowId: tab.windowId, index: tab.index + 1, active: tab.active }).catch(() => {});
+    await chrome.tabs.remove(tab.id).catch(() => {});
+    await chrome.storage.local.remove('alp_beat');
+  }
+};
+// v0.13.6 — o Chrome com "Economia de energia" congela (frozen) a aba que está em segundo
+// plano há 5 min gastando CPU: nada roda nela até alguém abrir a aba. Quando isso acontece
+// com a aba do grind, recarrega na hora (a página nova volta a rodar e o grind retoma).
+const onFrozen = async (tabId) => {
+  const { alp_grind, alp_beat, alp_lock } = await chrome.storage.local.get(['alp_grind', 'alp_beat', 'alp_lock']);
+  if (!alp_grind?.active || !alp_lock || alp_beat?.tabId !== tabId) return;
+  if (alp_beat.frozenAt && Date.now() - alp_beat.frozenAt < 20000) return; // já recarregando
+  await chrome.storage.local.set({ alp_beat: { ...alp_beat, frozenAt: Date.now() }, alp_watch: { at: Date.now(), reason: 'frozen' } });
+  await chrome.tabs.reload(tabId).catch(() => {});
+};
+chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.frozen === true) onFrozen(tabId); });
+
+const onBeat = async (tabId) => {
+  if (tabId == null) return;
+  const { alp_beat } = await chrome.storage.local.get('alp_beat');
+  if (alp_beat?.tabId !== tabId) chrome.tabs.update(tabId, { autoDiscardable: false }).catch(() => {}); // o Chrome não descarta a aba do grind
+  await chrome.storage.local.set({ alp_beat: { tabId, at: Date.now(), kicks: 0 } });
+};
+
 const schedule = () => {
   chrome.alarms.create('alp-update', { delayInMinutes: 1, periodInMinutes: CHECK_EVERY_MIN });
   chrome.alarms.create('alp-disk', { delayInMinutes: DISK_EVERY_MIN, periodInMinutes: DISK_EVERY_MIN });
 };
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === 'alp-update') checkUpdate();
-  if (a.name === 'alp-disk') watchDisk();
+  if (a.name === 'alp-disk') { watchDisk(); watchGrind(); }
 });
 
-chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (msg?.cmd === 'beat') { onBeat(sender?.tab?.id); return false; }
   if (msg?.cmd === 'updCheck') { checkUpdate().then(reply); return true; }
   if (msg?.cmd === 'openGuide') { chrome.tabs.create({ url: chrome.runtime.getURL('COMO-INSTALAR.html') + (msg.hash || '') }).then(() => reply({ ok: true })); return true; }
   if (msg?.cmd === 'updApply') { applyUpdate().then(reply, (e) => reply({ status: 'error', error: String(e?.message || e) })); return true; }
