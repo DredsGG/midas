@@ -1000,7 +1000,19 @@
   };
 
   // inicia o nó "active" (lição normal ainda não concluída) clicando no caminho
-  const startActiveNode = async (wantId = null) => {
+  // v0.13.7: com a aba em segundo plano, depois de um reload o caminho às vezes nem aparece na
+  // página (o Duolingo só desenha as unidades perto da tela, e aba escondida não desenha nada) e o
+  // nó ativo não é achado. Para lição/história/rádio/prática, abre pelo endereço direto do nó
+  // (/lesson/unit/U/level/N, conferido em 2026-10-25: credita o nó igual ao clique). Baú não tem
+  // endereço: continua só pelo clique.
+  const levelPath = (lv) => `/lesson/unit/${lv.unitIndex + 1}/level/${lv.levelInUnit + 1}`;
+  const startByRoute = async (lv) => {
+    if (!lv || lv.type === 'chest') return false;
+    report(T('log.routeStart'), 'warn');
+    await go(levelPath(lv));
+    return true;
+  };
+  const startActiveNode = async (wantId = null, lvWanted = null) => {
     await go('/learn');
     for (let i = 0; i < 20 && !$(S.path); i++) await sleep(300);
     // o baú não tem data-test (só aria-label "Abrir baú"): procura por todos os botões do caminho
@@ -1023,7 +1035,7 @@
       if (attempt) { await go('/practice-hub'); await sleep(900); await go('/learn'); }
       for (let i = 0; i < 20 && !(hit = findActive()); i++) await sleep(300);
     }
-    if (!hit) return false;
+    if (!hit) return startByRoute(lvWanted);
     const { node, lv: lvActive } = hit;
     node.scrollIntoView({ block: 'center' });
     await wait(500);
@@ -1046,7 +1058,7 @@
       else clickEl(node.firstElementChild) || node.firstElementChild?.click();
       for (let i = 0; i < 14 && !btn; i++) { await sleep(150); btn = startBtn(); }
     }
-    if (!btn) return false;
+    if (!btn) return startByRoute(lvWanted);
     btn.click();
     return true;
   };
@@ -1216,7 +1228,7 @@
       report(T('log.target', { mode: T(mode === 'normal' ? 'mode.lesson' : 'mode.legendary').toLowerCase(), u: lv.unitIndex + 1, n: lv.levelInUnit + 1, type: lv.type, name: lv.debugName }));
       if (mode === 'normal') {
         await ensureSection(lv.sectionIndex, sectionRange(levels, lv.sectionIndex));
-        started = await startActiveNode(lv.id);
+        started = await startActiveNode(lv.id, lv);
         if (!started) {
           const n = grindState.attempts[lv.id] = (grindState.attempts[lv.id] || 0) + 1;
           report(T('log.openFail', { n }), 'warn');
