@@ -47,6 +47,8 @@
   const ICON_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 7h-4.5v6h-5v-6H5z"/><rect x="5" y="18" width="14" height="3" rx="1.5"/></svg>';
   const ICON_REFRESH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.3A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.3A10 10 0 0 0 22 12z"/></svg>';
 
+  const ICON_BUG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4.4 7 2.9l1.1-1.1 1.8 1.8a5 5 0 0 1 4.2 0l1.8-1.8L17 2.9l-1.5 1.5A5 5 0 0 1 17 8H7a5 5 0 0 1 1.5-3.6zM6 10h12v4a6 6 0 0 1-12 0zm-4 1h3v2H2zm17 0h3v2h-3zM2 17l3-1 .6 1.9-3 1zm19.4 1.9-3-1L19 16l3 1zM11 11h2v8h-2z"/></svg>';
+
   const CSS = `
   :host { all: initial; }
   * { box-sizing: border-box; }
@@ -286,6 +288,25 @@
   .upd-st.new { color: var(--bee); cursor: pointer; text-decoration: underline dotted; }
   .wrap[data-theme="light"] .upd-st.new { color: var(--gold-text); }
   .fab.upd .dot { background: var(--macaw); }
+  /* relatar bug (v0.14.0) */
+  .bug { margin: 12px 12px 0; border-radius: 16px; border: 2px solid var(--macaw); border-bottom-width: 4px;
+    background: linear-gradient(180deg, rgba(28,176,246,.12), rgba(28,176,246,.03)); padding: 12px; animation: alp-pop .35s cubic-bezier(.3,1.4,.5,1); }
+  .bug-h { display: flex; gap: 10px; align-items: center; }
+  .bug-h b { flex: 1; font-size: 14px; font-weight: 800; }
+  .bug-ic { width: 34px; height: 34px; flex: none; border-radius: 12px; background: var(--macaw); display: grid; place-items: center; box-shadow: 0 3px 0 #1899d6; }
+  .bug-ic svg { width: 20px; height: 20px; fill: #04304a; }
+  .bug-x { border: 0; background: transparent; color: var(--hare); cursor: pointer; font-weight: 800; font-size: 14px; }
+  .bug textarea { width: 100%; margin-top: 10px; min-height: 70px; resize: vertical; border-radius: 12px; border: 2px solid var(--swan);
+    background: var(--polar); color: var(--eel); padding: 8px 10px; font: 600 13px/1.4 duolingo-sans, "din-round", "Nunito", system-ui, sans-serif; }
+  .bug textarea:focus { outline: none; border-color: var(--macaw); }
+  .bug details { margin-top: 8px; }
+  .bug summary { font-size: 12px; font-weight: 800; color: var(--macaw); }
+  .bug summary::after { color: var(--macaw); }
+  .bug pre { max-height: 150px; margin-top: 6px; padding: 8px; border-radius: 10px; background: var(--polar); }
+  .bug-note { margin: 8px 0 0; font-size: 11px; color: var(--hare); font-weight: 700; }
+  .bug .btn.blue { background: var(--macaw); color: #04304a; box-shadow: 0 4px 0 #1899d6; }
+  .bug .btn.blue:active { box-shadow: 0 1px 0 #1899d6; }
+  .updbtn.bugbtn { color: var(--macaw); }
   .keys kbd { font: 700 10px duolingo-sans, sans-serif; border: 2px solid var(--swan); border-bottom-width: 3px; border-radius: 6px; padding: 0 4px; color: var(--wolf); }
   `;
 
@@ -315,6 +336,13 @@
         <p class="upd-msg" hidden></p>
         <button class="upd-guide" type="button" data-a="updGuide">${tx('upd.guide')}</button>
         <div class="upd-btns"><button class="btn gold" data-a="updApply">${tx('upd.now')}</button><button class="btn ghost" data-a="updLater">${tx('upd.later')}</button></div>
+      </div>
+      <div class="bug" hidden>
+        <div class="bug-h"><span class="bug-ic">${ICON_BUG}</span><b>${tx('bug.title')}</b><button class="bug-x" type="button" data-a="bugClose" aria-label="✕">✕</button></div>
+        <textarea data-s="bugWhat" rows="3" placeholder="${esc(T('bug.ph'))}" data-i18n-ph="bug.ph"></textarea>
+        <details><summary>${tx('bug.diag')}</summary><pre data-s="bugDiag"></pre></details>
+        <p class="bug-note">${tx('bug.note')}</p>
+        <div class="upd-btns"><button class="btn blue" data-a="bugGh">${tx('bug.open')}</button><button class="btn ghost" data-a="bugCopy">${tx('bug.copy')}</button></div>
       </div>
       <div class="body">
         <div class="card">
@@ -347,7 +375,7 @@
         <details class="card" data-a="log"><summary><h3 class="ttl">${tx('log.title')}${info('help.log')}</h3><button class="copy" data-a="copy" title="${esc(T('log.copyTitle'))}" data-i18n-title="log.copyTitle">${tx('log.copy')}</button></summary><pre></pre><div class="unk"></div></details>
       </div>
       <div class="keys"><span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> ${tx('key.solve')}</span><span><kbd>Alt</kbd>+<kbd>G</kbd> ${tx('key.grind')}</span><span><kbd>Alt</kbd>+<kbd>X</kbd> ${tx('key.stop')}</span><span><kbd>Alt</kbd>+<kbd>H</kbd> ${tx('key.hud')}</span></div>
-      <div class="updrow"><button class="updbtn" type="button" data-a="updCheck">${ICON_REFRESH}${tx('upd.check')}</button>${info('help.update')}<span class="upd-st"></span></div>
+      <div class="updrow"><button class="updbtn" type="button" data-a="updCheck">${ICON_REFRESH}${tx('upd.check')}</button>${info('help.update')}<span class="upd-st"></span><button class="updbtn bugbtn" type="button" data-a="bugOpen">${ICON_BUG}${tx('bug.btn')}</button>${info('help.bug')}</div>
       <div class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span class="by">${tx('credit.by')}</span><a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a><span class="ver" data-s="ver"></span></div>
     </section>
     <div class="tip" role="tooltip" hidden></div>
@@ -469,6 +497,25 @@
     $('[data-a="updCheck"]').addEventListener('click', () => { state.updStatus = 'checking'; render(); toBridge('updCheck'); });
     $('[data-a="updApply"]').addEventListener('click', () => { state.updStatus = 'applying'; render(); toBridge('updApply'); });
     $('[data-a="updLater"]').addEventListener('click', () => { state.upd.dismissed = state.upd.latest; state.updStatus = null; render(); toBridge('updDismiss', state.upd.latest); });
+    // relatar bug: monta o relatório, abre o GitHub já preenchido ou copia
+    const bugCard = $('.bug'), bugWhat = $('[data-s="bugWhat"]');
+    const fillDiag = () => { $('[data-s="bugDiag"]').textContent = bugReport('').diag; };
+    $('[data-a="bugOpen"]').addEventListener('click', () => { bugCard.hidden = !bugCard.hidden; if (!bugCard.hidden) { fillDiag(); bugWhat.focus(); $('.panel').scrollTop = 0; } });
+    $('[data-a="bugClose"]').addEventListener('click', () => { bugCard.hidden = true; });
+    // as teclas digitadas no campo não podem virar atalho do Midas/Duolingo
+    bugWhat.addEventListener('keydown', (e) => e.stopPropagation());
+    $('[data-a="bugGh"]').addEventListener('click', () => { window.open(bugUrl(bugWhat.value), '_blank', 'noopener'); });
+    $('[data-a="bugCopy"]').addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      const r = bugReport(bugWhat.value, 200);
+      const text = `Midas — bug report\n\n${r.what || '-'}\n\n${r.diag}`;
+      let ok = false;
+      try { await navigator.clipboard.writeText(text); ok = true; } catch {
+        const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { ok = document.execCommand('copy'); } catch {} ta.remove();
+      }
+      b.textContent = T(ok ? 'bug.copied' : 'log.failed'); setTimeout(() => (b.textContent = T('bug.copy')), 1600);
+    });
     $('[data-a="updGuide"]').addEventListener('click', () => toBridge('openGuide', '#atualizar'));
     $('[data-a="updSeen"]').addEventListener('click', () => { state.upd.justUpdated = null; render(); toBridge('updDismiss', state.upd.dismissed ?? null); });
     $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.dismissed = null; render(); toBridge('updDismiss', null); });
@@ -562,6 +609,7 @@
     for (const el of root.querySelectorAll('[data-i18n]')) el.textContent = T(el.dataset.i18n);
     for (const el of root.querySelectorAll('[data-i18n-title]')) el.title = T(el.dataset.i18nTitle);
     for (const el of root.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', T(el.dataset.i18nAria));
+    for (const el of root.querySelectorAll('[data-i18n-ph]')) el.placeholder = T(el.dataset.i18nPh);
     const copy = $('[data-a="copy"]'); if (copy) copy.textContent = T('log.copy');
     render();
   };
@@ -607,15 +655,52 @@
       for (const b of $('.panel').querySelectorAll('.seg button')) b.classList.toggle('on', b.dataset.p === pr);
       $('[data-s="hint"]').textContent = T('preset.' + pr);
     }
-    $('pre').innerHTML = state.logs.slice(-200).map((l) =>
+    // v0.14.4: o <pre> do relatório de bug (v0.14.0) vinha antes e "$('pre')" pegava ele — o log sumia
+    const pre = $('details[data-a="log"] pre');
+    pre.innerHTML = state.logs.slice(-200).map((l) =>
       `<span class="lv-${l.level}">${new Date(l.t).toLocaleTimeString(I18N.locale)} ${esc(l.msg)}</span>`).join('\n') || esc(T('log.empty'));
-    const pre = $('pre'); pre.scrollTop = pre.scrollHeight;
+    pre.scrollTop = pre.scrollHeight;
     paintTheme();
     $('.stale').hidden = !state.stale;
     for (const f of $('.wrap').querySelectorAll('.flag')) f.classList.toggle('on', f.dataset.lang === I18N.lang);
     $('[data-s="ver"]').textContent = state.version ? '· v' + state.version : '';
     $('.unk').textContent = state.unknown.size ? T('unk', { list: [...state.unknown].join(', ') }) : '';
     renderUpd();
+  };
+
+  // ───────── relatório de bug (v0.14.0) ─────────
+  // Só o que ajuda a corrigir: versão, navegador, onde o grind estava e o fim do log.
+  // Nada da conta (sem usuário, e-mail, token ou cookie).
+  const GH_NEW = 'https://github.com/DredsGG/midas/issues/new';
+  const bugReport = (what, maxLog = 80) => {
+    const ua = navigator.userAgent;
+    const chrome = (ua.match(/Chrome\/([\d.]+)/) || [])[1] || '?';
+    const os = /Windows NT 10/.test(ua) ? 'Windows 10/11' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : '?';
+    const p = state.progress, c = p?.current, cfg = API()?.cfg || {};
+    let ch = '-', st = '-';
+    try { st = API()?.getStatus?.() || '-'; ch = API()?.getChallenge?.()?.ch?.type || '-'; } catch { /* ok */ }
+    const meta = [
+      `Midas: v${state.version || '?'} (${state.upd?.installType || '?'})`,
+      `Browser: Chrome ${chrome} · ${os} · UI ${I18N.lang} · ${navigator.language}`,
+      `Grind: ${state.running || 'stopped'} · ${cfg.preset || '?'} ${cfg.delay ?? '?'} ms${cfg.humanize ? ' · humanized' : ''}`,
+      c ? `Now: unit ${c.u + 1}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
+      p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
+      `Page: ${location.pathname} · status ${st} · challenge ${ch}`,
+      state.unknown.size ? `New types: ${[...state.unknown].join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+    const log = state.logs.slice(-maxLog).map((l) =>
+      `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`);
+    return { what: String(what || '').trim(), meta, log, diag: `${meta}\n\nLog:\n${log.join('\n')}` };
+  };
+  // relato pré-preenchido no GitHub; o log é cortado do começo até o endereço caber
+  const bugUrl = (what) => {
+    const r = bugReport(what);
+    const title = '[Bug] ' + (r.what.split('\n')[0].slice(0, 70) || `v${state.version || '?'} ${state.progress?.current?.type || ''}`.trim());
+    const make = (log, cut) => `${GH_NEW}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(
+      `### ${T('bug.whatHead')}\n\n${r.what || '-'}\n\n### Diagnostics\n\n\`\`\`text\n${r.meta}\n\nLog${cut ? ' (' + T('bug.trimmed') + ')' : ''}:\n${log.join('\n')}\n\`\`\`\n`)}`;
+    let log = r.log, url = make(log, false);
+    while (url.length > 7500 && log.length > 5) { log = log.slice(Math.ceil(log.length / 5)); url = make(log, true); }
+    return url;
   };
 
   // notas do Release (markdown simples) → até 6 itens curtos

@@ -24,6 +24,14 @@
     <div class="upd-btns"><button id="upd-apply" class="primary" data-i18n="upd.now"></button><button id="upd-later" data-i18n="upd.later"></button></div>
   </section>
 
+  <section id="bug" class="card bug" hidden>
+    <div class="upd-h"><span class="bug-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4.4 7 2.9l1.1-1.1 1.8 1.8a5 5 0 0 1 4.2 0l1.8-1.8L17 2.9l-1.5 1.5A5 5 0 0 1 17 8H7a5 5 0 0 1 1.5-3.6zM6 10h12v4a6 6 0 0 1-12 0zm-4 1h3v2H2zm17 0h3v2h-3zM2 17l3-1 .6 1.9-3 1zm19.4 1.9-3-1L19 16l3 1zM11 11h2v8h-2z"/></svg></span><b data-i18n="bug.title" style="flex:1"></b><button id="bug-close" class="bug-x" type="button" aria-label="✕">✕</button></div>
+    <textarea id="bug-what" rows="3" data-i18n-ph="bug.ph"></textarea>
+    <details><summary data-i18n="bug.diag"></summary><pre id="bug-diag"></pre></details>
+    <p class="muted small bug-note" data-i18n="bug.note"></p>
+    <div class="upd-btns"><button id="bug-gh" class="blue" data-i18n="bug.open"></button><button id="bug-copy" data-i18n="bug.copy"></button></div>
+  </section>
+
   <section class="card">
     <div class="row between">
       <h2 class="ttl"><span data-i18n="grind.title"></span><button class="info" data-help="help.grind">i</button></h2>
@@ -65,7 +73,7 @@
   <footer class="muted small">
     <span data-i18n="pop.footer1"></span><br>
     <span data-i18n="pop.footer2"></span>
-    <span class="updrow"><button id="upd-check" class="updbtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.3A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.3A10 10 0 0 0 22 12z"/></svg><span data-i18n="upd.check"></span></button><button class="info" data-help="help.update">i</button><span id="upd-st" class="upd-st"></span></span>
+    <span class="updrow"><button id="upd-check" class="updbtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a8 8 0 0 1 7.4 5H17v2h6V5h-2v2.3A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8zm8 8a8 8 0 0 1-15.4 3H7v-2H1v6h2v-2.3A10 10 0 0 0 22 12z"/></svg><span data-i18n="upd.check"></span></button><button class="info" data-help="help.update">i</button><span id="upd-st" class="upd-st"></span><button id="bug-open" class="updbtn bugbtn" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4.4 7 2.9l1.1-1.1 1.8 1.8a5 5 0 0 1 4.2 0l1.8-1.8L17 2.9l-1.5 1.5A5 5 0 0 1 17 8H7a5 5 0 0 1 1.5-3.6zM6 10h12v4a6 6 0 0 1-12 0zm-4 1h3v2H2zm17 0h3v2h-3zM2 17l3-1 .6 1.9-3 1zm19.4 1.9-3-1L19 16l3 1zM11 11h2v8h-2z"/></svg><span data-i18n="bug.btn"></span></button><button class="info" data-help="help.bug">i</button></span>
     <span class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span data-i18n="credit.by"></span> <a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a> <span id="ver"></span></span>
   </footer>
   <div id="tip" class="tip" role="tooltip" hidden></div>

@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.13.8-f5b301)
+![Version](https://img.shields.io/badge/version-0.14.4-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/midas-popup.png" width="380" alt="Midas popup: Auto Grind progress, current lesson controls and speed presets">
@@ -25,6 +25,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 - **In-page HUD.** A gold crown in the corner of Duolingo opens a draggable, resizable panel (shadow DOM, Duolingo's own colors) with live progress, current lesson controls, settings and log.
 - **Speed presets.** *Rage* (0 ms, as fast as possible), *Legit* (about 2.5 s between actions with human-like variation) or *Manual* (pick your own delay and humanizing).
 - **PT / EN / ES** and **light / dark** themes, shared between the HUD and the popup.
+- **Report a bug.** A bug button next to *Check for updates* (HUD and popup) opens a card where you describe what happened. It attaches a diagnostic with no account data (version, browser, grind state and speed, current node, progress, recent log lines, never your user, e-mail, token or cookies) and opens a prefilled GitHub issue, or copies the full report to paste anywhere.
 
 ### Hotkeys
 

@@ -164,5 +164,19 @@ html[data-theme="light"] .updok button, html[data-theme="light"] .updbtn { backg
 .upd-guide { margin-top: 8px; padding: 0; border: 0; background: none !important; color: #1cb0f6; font-weight: 800; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
 html[data-theme="light"] .upd-guide { color: #0b78b3; }
 
+/* relatar bug (v0.14.0) */
+.bug { border: 2px solid #1cb0f6; border-bottom-width: 4px; background: linear-gradient(180deg, rgba(28,176,246,.12), rgba(28,176,246,.03)); animation: alp-pop .35s cubic-bezier(.3,1.4,.5,1); }
+.bug-ic { width: 32px; height: 32px; flex: none; border-radius: 10px; background: #1cb0f6; display: grid; place-items: center; box-shadow: 0 3px 0 #1899d6; }
+.bug-ic svg { width: 18px; height: 18px; fill: #04304a; }
+.bug-x { background: transparent !important; border: 0; color: var(--muted); padding: 0 4px; }
+.bug textarea { width: 100%; margin-top: 8px; min-height: 64px; resize: vertical; border-radius: 10px; border: 1px solid var(--line); background: rgba(127,127,127,.08); color: var(--text); padding: 7px 9px; font: inherit; }
+.bug textarea:focus { outline: none; border-color: #1cb0f6; }
+.bug details { margin-top: 6px; } .bug summary { color: #1cb0f6; font-size: 12px; }
+.bug pre { max-height: 140px; }
+.bug-note { margin-top: 6px; }
+button.blue { background: #1cb0f6 !important; color: #04304a; border-color: #1899d6; font-weight: 800; }
+.updbtn.bugbtn { color: #1cb0f6; }
+html[data-theme="light"] .updbtn.bugbtn, html[data-theme="light"] .bug summary { color: #0b78b3; }
+
 /* v0.13.5: o atributo hidden vence o display das caixas (.updok tem display:flex) */
 [hidden] { display: none !important; }

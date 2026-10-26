@@ -110,6 +110,7 @@ const refresh = async () => {
 const applyI18n = () => {
   document.documentElement.lang = I18N.locale || 'en';
   document.querySelectorAll('[data-i18n]').forEach((el) => (el.textContent = T(el.dataset.i18n)));
+  document.querySelectorAll('[data-i18n-ph]').forEach((el) => (el.placeholder = T(el.dataset.i18nPh)));
   $('copy').title = T('log.copyTitle');
   document.querySelectorAll('button.info').forEach((b) => b.setAttribute('aria-label', T('help.label')));
   if (applyI18n.wired) return; // os balões só são ligados uma vez (troca de idioma reaplica só os textos)
@@ -200,6 +201,47 @@ document.addEventListener('DOMContentLoaded', async () => {
     send(alp_running === 'grind' ? 'stop' : 'grind');
   });
   document.querySelectorAll('[data-cmd]').forEach((b) => b.addEventListener('click', () => send(b.dataset.cmd)));
+
+  // ───────── relatar bug (v0.14.0) ─────────
+  const bugReport = async (what, maxLog = 80) => {
+    const st = await chrome.storage.local.get(['alp_log', 'alp_progress', 'alp_update', 'alp_cfg', 'alp_running', 'alp_unknown']);
+    const ua = navigator.userAgent;
+    const chromeV = (ua.match(/Chrome\/([\d.]+)/) || [])[1] || '?';
+    const os = /Windows NT 10/.test(ua) ? 'Windows 10/11' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : '?';
+    const p = st.alp_progress, c = p?.current, cfg = { ...DEFAULTS, ...(st.alp_cfg || {}) };
+    const unk = Object.keys(st.alp_unknown || {});
+    const meta = [
+      `Midas: v${chrome.runtime.getManifest().version} (${st.alp_update?.installType || '?'}) · popup`,
+      `Browser: Chrome ${chromeV} · ${os} · UI ${I18N.lang} · ${navigator.language}`,
+      `Grind: ${st.alp_running || 'stopped'} · ${cfg.preset} ${cfg.delay} ms${cfg.humanize ? ' · humanized' : ''}`,
+      c ? `Now: unit ${c.u + 1}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
+      p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
+      unk.length ? `New types: ${unk.join(', ')}` : '',
+    ].filter(Boolean).join('\n');
+    const log = (st.alp_log || []).slice(-maxLog).map((l) => `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`);
+    return { what: String(what || '').trim(), meta, log, diag: `${meta}\n\nLog:\n${log.join('\n')}` };
+  };
+  const bugUrl = async (what) => {
+    const r = await bugReport(what);
+    const title = '[Bug] ' + (r.what.split('\n')[0].slice(0, 70) || `v${chrome.runtime.getManifest().version}`);
+    const make = (log, cut) => `https://github.com/DredsGG/midas/issues/new?title=${encodeURIComponent(title)}&body=${encodeURIComponent(
+      `### ${T('bug.whatHead')}\n\n${r.what || '-'}\n\n### Diagnostics\n\n\`\`\`text\n${r.meta}\n\nLog${cut ? ' (' + T('bug.trimmed') + ')' : ''}:\n${log.join('\n')}\n\`\`\`\n`)}`;
+    let log = r.log, url = make(log, false);
+    while (url.length > 7500 && log.length > 5) { log = log.slice(Math.ceil(log.length / 5)); url = make(log, true); }
+    return url;
+  };
+  $('bug-open').addEventListener('click', async () => {
+    $('bug').hidden = !$('bug').hidden;
+    if (!$('bug').hidden) { $('bug-diag').textContent = (await bugReport('')).diag; $('bug-what').focus(); scrollTo(0, 0); }
+  });
+  $('bug-close').addEventListener('click', () => { $('bug').hidden = true; });
+  $('bug-gh').addEventListener('click', async () => { chrome.tabs.create({ url: await bugUrl($('bug-what').value) }); });
+  $('bug-copy').addEventListener('click', async () => {
+    const r = await bugReport($('bug-what').value, 200);
+    try { await navigator.clipboard.writeText(`Midas — bug report\n\n${r.what || '-'}\n\n${r.diag}`); $('bug-copy').textContent = T('bug.copied'); }
+    catch { $('bug-copy').textContent = T('log.failed'); }
+    setTimeout(() => ($('bug-copy').textContent = T('bug.copy')), 1600);
+  });
 
   $('upd-check').addEventListener('click', async () => {
     updStatus = 'checking'; renderUpd();
