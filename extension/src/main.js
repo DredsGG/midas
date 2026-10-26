@@ -1249,6 +1249,24 @@
       srOverride = null;
       if (token.stop) break;
       if (r === 'reload') {
+        // v0.14.4: a mesma fala travando em loop (recarrega → volta a fala → recarrega) gira para
+        // sempre. Na 3ª vez em 20 min no mesmo nó, pula o nó nesta hora (o reinício de 1 h zera a lista).
+        const SPK = 'alp.speakReloads';
+        let sp = {};
+        try { sp = JSON.parse(localStorage.getItem(SPK) || '{}'); } catch { /* sem storage */ }
+        if (sp.id !== lv.id || Date.now() - (sp.at || 0) > 20 * 60e3) sp = { id: lv.id, n: 0, at: Date.now() };
+        sp.n++;
+        try { localStorage.setItem(SPK, JSON.stringify(sp)); } catch { /* idem */ }
+        if (sp.n >= 3) {
+          report(T('log.speakSkipNode'), 'warn');
+          grindState.skip[lv.id] = 'speak';
+          emit('grindStep', { skip: grindState.skip });
+          if (sessionVisible() || !onLearnPage()) await go('/learn');
+          continue;
+        }
+        // sai da lição antes de recarregar: dentro dela o Duolingo segura a página com o aviso
+        // "Sair do site?" e o reload não acontecia (o grind girava na mesma página sem fala)
+        if (sessionVisible() || !onLearnPage()) { await go('/learn'); await sleep(1200); }
         emit('reloading', { fresh: false });
         await sleep(60000); // a ponte recarrega; se não recarregar, segue
         continue;
