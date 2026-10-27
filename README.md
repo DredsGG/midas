@@ -11,7 +11,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 ![Version](https://img.shields.io/badge/version-0.14.4-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
-<img src="docs/midas-popup.png" width="380" alt="Midas popup: Auto Grind progress, current lesson controls and speed presets">
+<img src="docs/hud-auto-grind.png" width="420" alt="Midas HUD inside Duolingo: Auto Grind progress with legendary, left and estimate counters, current lesson buttons, speed presets and the live log">
 
 </div>
 
@@ -19,13 +19,24 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 
 ## What it does
 
-- **Auto Grind (“Gild everything”).** Reads your whole learning path, finishes the lessons you haven't done, then runs Legendary on every `skill`, `story` and `practice` node (Spaced Repetition practices included: Midas fills in the skill list the Duolingo website leaves empty), from the first unit to the last. It checks each node actually turned legendary and retries once. It finishes on its own when nothing is left; otherwise it keeps going until you press **Stop**: if the tab reloads mid-run it picks up where it stopped, it reloads the page by itself every hour (between nodes) and whenever the path gets stuck, a watchdog in the background reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs, and only one Duolingo tab grinds at a time. When Duolingo asks for a new streak goal, it picks the highest one.
-- **Lesson solver.** 40+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added.
+- **Auto Grind (“Gild everything”).** Reads your whole learning path, finishes the lessons you haven't done, then runs Legendary on every `skill`, `story` and `practice` node, from the first unit to the last (Spaced Repetition practices included: Midas fills in the skill list the Duolingo website leaves empty). It checks that each node really turned legendary and retries once. It stops on its own when nothing is left, or when you press **Stop**. It is built to run unattended:
+  - if the tab reloads mid-run, it picks up where it stopped; it also reloads the page by itself every hour (between nodes) and whenever the path gets stuck;
+  - if the next lesson node doesn't show up on the page (it happens in background tabs), it opens the lesson by its direct address;
+  - a speaking exercise that can't be skipped makes it leave the lesson and reload; after 3 tries on the same node it moves on and comes back at the hourly restart;
+  - a background watchdog reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs;
+  - only one Duolingo tab grinds at a time, and when Duolingo asks for a streak goal it picks the highest one.
+- **Lesson solver.** 35+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added.
 - **Story solver.** Multiple choice, select phrase, arrange, gap fill, point-to-phrase and match.
 - **In-page HUD.** A gold crown in the corner of Duolingo opens a draggable, resizable panel (shadow DOM, Duolingo's own colors) with live progress, current lesson controls, settings and log.
 - **Speed presets.** *Rage* (0 ms, as fast as possible), *Legit* (about 2.5 s between actions with human-like variation) or *Manual* (pick your own delay and humanizing).
 - **PT / EN / ES** and **light / dark** themes, shared between the HUD and the popup.
 - **Report a bug.** A bug button next to *Check for updates* (HUD and popup) opens a card where you describe what happened. It attaches a diagnostic with no account data (version, browser, grind state and speed, current node, progress, recent log lines, never your user, e-mail, token or cookies) and opens a prefilled GitHub issue, or copies the full report to paste anywhere.
+
+<p align="center">
+  <img src="docs/popup-auto-grind.png" width="320" alt="Midas toolbar popup: Auto Grind running with progress counters, current lesson buttons, speed presets, the log and the Check for updates and Report a bug buttons">
+  &nbsp;
+  <img src="docs/popup-report-bug.png" width="320" alt="Report a bug card in the Midas popup: a text box for what happened, the list of what gets attached and the Open on GitHub and Copy report buttons">
+</p>
 
 ### Hotkeys
 
@@ -46,7 +57,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 3. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and pick the folder that has `manifest.json`. From a clone of this repo, load the `extension/` folder.
 4. Open (or reload) duolingo.com.
 
-Keep Duolingo in its **own visible window** while grinding: Chrome throttles timers in background tabs and the grind slows down a lot.
+Keep Duolingo in its **own visible window** while grinding: Chrome throttles timers in background tabs and the grind slows down a lot. If Chrome's **Energy Saver** is on (Settings → Performance), it can freeze a background Duolingo tab; Midas reloads it and carries on, but turning Energy Saver off avoids the interruptions.
 
 ## Updates
 
@@ -78,6 +89,7 @@ Measured on a live account: a Legendary skill went 17/17 with no mistakes in abo
 ### Known limits
 
 - `speak`, `characterTrace` and `characterWrite` challenges are skipped (in Legendary a skip counts as a mistake).
+- Chests on the path are opened by clicking them, so they need the path to be drawn on the page; there is no direct address for them.
 
 ## Credits
 
