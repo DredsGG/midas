@@ -816,13 +816,16 @@
   const userId = () => {
     try { return JSON.parse(atob(jwt().split('.')[1])).sub; } catch { return null; }
   };
+  const shortPath = (p) => String(p).split('?')[0].replace(/\/users\/\d+/g, '/users/…');
   const api = async (path, opts = {}) => {
     const res = await fetch(path, {
       credentials: 'include',
       ...opts,
       headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/json', ...(opts.headers || {}) },
     });
-    if (!res.ok) throw new Error(`${opts.method || 'GET'} ${path} → ${res.status}`);
+    // v0.16.3: no log vai só o endereço curto, sem o número da conta e sem a consulta enorme
+    // (a consulta inteira empurrava a HUD para os lados e o id da conta ia parar no "Relatar bug")
+    if (!res.ok) throw new Error(`${opts.method || 'GET'} ${shortPath(path)} → ${res.status}`);
     return res.json();
   };
 
@@ -1388,6 +1391,9 @@
     stop: () => { stopAll(); report(T('log.stopped')); },
     // outra aba assumiu o grind: para aqui sem desligar o grind salvo
     yield: () => { if (current?.kind === 'grind') { stopAll(false); report(T('log.otherTab'), 'warn'); } },
+    // v0.17.0: versão URGENTE no GitHub → pausa o que estiver rodando (o grind salvo continua ligado e
+    // retoma sozinho depois da atualização)
+    pause: () => { if (current) { stopAll(false); report(T('log.updUrgent'), 'warn'); } },
     note: (k) => report(T('log.' + k), 'warn'),
     theme: (t) => emit('theme', t), // escolha feita no popup → HUD
     lang: (l) => window[Symbol.for('alp.i18n')]?.setLang?.(l), // escolha feita no popup

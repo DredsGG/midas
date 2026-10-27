@@ -3,6 +3,18 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.17.0': [
+      'Con Duolingo abierto, Midas busca versión nueva solo: al abrir, cada 30 min y cuando vuelves a la pestaña.',
+      'El aviso de versión nueva aparece al instante, sin recargar; la X solo lo pospone 1 hora (o hasta abrir el navegador de nuevo).',
+      'Versión marcada como URGENTE: el aviso no se cierra y Midas queda en pausa hasta que actualices.',
+    ],
+    '0.16.4': [
+      'Los cuadros de novedades, versión nueva y tutorial quedan centrados en la parte de abajo de la pantalla, sin tapar el próximo nodo del camino.',
+    ],
+    '0.16.3': [
+      'La ventana de Midas ya no queda cortada ni deja de redimensionarse cuando Duolingo responde con error: el log parte las líneas largas.',
+      'Los errores del servidor de Duolingo aparecen en el log con la dirección corta, sin el número de tu cuenta (y ya no va en Reportar bug).',
+    ],
     '0.16.2': [
       'La recarga por camino desactualizado solo ocurre cuando la pestaña muestra otro nodo como activo; con la pestaña en segundo plano Midas abre la lección directo, sin perder tiempo.',
     ],

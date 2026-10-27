@@ -1,8 +1,8 @@
 // Midas — service worker: badge do ícone + atualizações (v0.13.0).
 //
 // Atualização (pedido do André em 2026-10-23, regra 7 nova):
-// - Procura versão nova nos Releases do GitHub (DredsGG/midas): ao abrir o Chrome, a cada 6 h
-//   e quando alguém clica em "Procurar atualização" (HUD ou popup).
+// - Procura versão nova nos Releases do GitHub (DredsGG/midas): ao abrir o Chrome, a cada 30 min,
+//   ao abrir e ao voltar para a aba do Duolingo (máx. 1x/10 min) e no "Procurar atualização".
 // - Instalada pela Chrome Web Store: "Atualizar" pede a versão nova ao Chrome e recarrega.
 // - Instalada por pasta (modo desenvolvedor): o Chrome não deixa a extensão trocar os próprios
 //   arquivos. "Atualizar" baixa o zip; quando os arquivos novos chegam na pasta (zip extraído por
@@ -13,7 +13,10 @@ const REPO = 'DredsGG/midas';
 // fundo (Firefox, "background.scripts"). Nada de window/DOM aqui.
 const IS_FIREFOX = typeof browser !== 'undefined' && typeof browser.runtime?.getBrowserInfo === 'function';
 const DUO = 'https://www.duolingo.com/*';
-const CHECK_EVERY_MIN = 360;
+// v0.17.0 (regra 14 revisada em 27/10): procura a cada 30 min; a página do Duolingo também pede ao
+// abrir e ao voltar para a aba, no máximo 1 vez a cada 10 min (pedido "soft").
+const CHECK_EVERY_MIN = 30;
+const SOFT_MIN_MS = 10 * 60e3;
 const DISK_EVERY_MIN = 1;
 
 // v0.15.0: no Firefox o usuário pode tirar a permissão do duolingo.com em about:addons; sem ela os
@@ -69,7 +72,13 @@ const fetchNews = async (ver) => {
   return Object.keys(out).length ? out : null;
 };
 
-const checkUpdate = async () => {
+// Release com "URGENTE" no título (o André marca para bug grave): quadro sem X e grind pausado até atualizar
+const isUrgent = (j) => /URGENTE?\b/i.test(String(j?.name || ''));
+const checkUpdate = async (opts = {}) => {
+  if (opts.soft) {
+    const { alp_update } = await chrome.storage.local.get('alp_update');
+    if (alp_update?.checkedAt && Date.now() - alp_update.checkedAt < SOFT_MIN_MS) return alp_update;
+  }
   const cur = current();
   const base = { checkedAt: Date.now(), current: cur, installType: await installType() };
   try {
@@ -85,7 +94,7 @@ const checkUpdate = async () => {
     const news = available ? await fetchNews(latest) : null;
     const st = await saveUpdate({
       ...base, latest, news, notes: String(j.body || '').slice(0, 4000), page: j.html_url || null, zip, xpi, browser: IS_FIREFOX ? 'firefox' : 'chromium',
-      available, error: null,
+      available, urgent: available && isUrgent(j), title: String(j.name || ''), error: null,
     });
     // instalada pela loja + grind rodando sozinho: aplica já (a página recarrega e o grind continua)
     if (st.available && st.installType === 'normal' && !IS_FIREFOX) {
@@ -195,14 +204,15 @@ chrome.alarms.onAlarm.addListener((a) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.cmd === 'beat') { onBeat(sender?.tab?.id); return false; }
-  if (msg?.cmd === 'updCheck') { checkUpdate().then(reply); return true; }
+  if (msg?.cmd === 'updCheck') { checkUpdate({ soft: !!msg.soft }).then(reply); return true; }
   if (msg?.cmd === 'openGuide') { chrome.tabs.create({ url: chrome.runtime.getURL('COMO-INSTALAR.html') + (msg.hash || '') }).then(() => reply({ ok: true })); return true; }
   if (msg?.cmd === 'updApply') { applyUpdate().then(reply, (e) => reply({ status: 'error', error: String(e?.message || e) })); return true; }
   return false;
 });
 
 chrome.storage.onChanged.addListener((changes) => { if (changes.alp_running) paint(); });
-chrome.runtime.onStartup.addListener(() => { paint(); schedule(); checkUpdate(); });
+// v0.17.0: abrir o navegador de novo desfaz o "adiar" do X (o aviso volta na próxima abertura)
+chrome.runtime.onStartup.addListener(async () => { paint(); schedule(); await saveUpdate({ snooze: null }); checkUpdate(); });
 chrome.runtime.onInstalled.addListener(async (d) => {
   paint();
   schedule();
@@ -214,7 +224,7 @@ chrome.runtime.onInstalled.addListener(async (d) => {
   if (d.reason === 'update' && !alp_seen) await chrome.storage.local.set({ alp_seen: { tutorial: true, news: d.previousVersion || '' } });
   if (d.reason === 'update') {
     // aviso "atualizado para vX" na HUD/popup + versão nova já conferida no GitHub
-    await saveUpdate({ justUpdated: { from: d.previousVersion || null, to: current(), at: Date.now() }, available: false, current: current() });
+    await saveUpdate({ justUpdated: { from: d.previousVersion || null, to: current(), at: Date.now() }, available: false, urgent: false, snooze: null, current: current() });
     // versão nova pode resolver o que fez um nó ser pulado: retenta todos os pulados
     const { alp_grind } = await chrome.storage.local.get('alp_grind');
     if (alp_grind) await chrome.storage.local.set({ alp_grind: { ...alp_grind, skip: {} } });

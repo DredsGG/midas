@@ -43,18 +43,25 @@
   chrome.storage.onChanged.addListener((ch) => {
     if (ch.alp_lang?.newValue) send('lang', ch.alp_lang.newValue);
     if (ch.alp_theme?.newValue) send('theme', ch.alp_theme.newValue);
-    if (ch.alp_update?.newValue) toHud('update', ch.alp_update.newValue);
+    if (ch.alp_update?.newValue) { toHud('update', ch.alp_update.newValue); setUrgent(ch.alp_update.newValue); }
   });
 
   // v0.13.0: atualizações (o service worker procura no GitHub; aqui só leva e traz para a HUD)
   const toHud = (type, data) => fire('alp:out', { type, data });
-  let askedCheck = false;
   const pushUpdate = safe(async () => {
     const { alp_update } = await chrome.storage.local.get('alp_update');
     toHud('update', alp_update || {});
-    // a HUD abriu e a última procura tem mais de 1 h: procura de novo
-    if (!askedCheck && (!alp_update?.checkedAt || Date.now() - alp_update.checkedAt > 3600e3)) { askedCheck = true; chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => {}); }
+    setUrgent(alp_update);
   });
+  // v0.17.0 (regra 14 revisada): com a página aberta, procura versão nova ao abrir, a cada 30 min e
+  // ao voltar para a aba. O service worker segura no máximo 1 procura a cada 10 min ("soft").
+  const softCheck = safe(async () => { await chrome.runtime.sendMessage({ cmd: 'updCheck', soft: true }); });
+  setInterval(softCheck, 30 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') softCheck(); });
+  addEventListener('focus', () => softCheck());
+  // versão URGENTE: nada roda até atualizar (o grind salvo continua ligado e retoma depois)
+  let urgent = false;
+  const setUrgent = (u) => { urgent = !!(u && u.available && u.urgent); if (urgent) send('pause'); };
 
   // v0.12.9: uma aba só roda o grind. Cada aba tem um id que sobrevive ao reload
   // (sessionStorage é por aba); a aba que roda renova alp_lock a cada 10 s.
@@ -101,6 +108,7 @@
     }
     if (alp_grind?.active) {
       setTimeout(safe(async () => {
+        if (urgent) { send('note', 'updUrgent'); return; }
         if (await otherTabRunning()) { send('note', 'otherTab'); return; }
         send('grind', { skip: alp_grind.skip || {}, resume: true });
       }), 2500 + Math.floor(Math.random() * 1500));
@@ -152,8 +160,15 @@
         break;
       }
       case 'updDismiss': {
+        // v0.17.0: o X só adia: 1 h (ou até abrir o navegador de novo); versão urgente não adia
         const { alp_update = {} } = await chrome.storage.local.get('alp_update');
-        await chrome.storage.local.set({ alp_update: { ...alp_update, dismissed: data ?? null, justUpdated: null } });
+        const snooze = data && !alp_update.urgent ? { ver: String(data), until: Date.now() + 3600e3 } : null;
+        await chrome.storage.local.set({ alp_update: { ...alp_update, snooze, justUpdated: null } });
+        break;
+      }
+      case 'updJustSeen': {
+        const { alp_update = {} } = await chrome.storage.local.get('alp_update');
+        await chrome.storage.local.set({ alp_update: { ...alp_update, justUpdated: null } });
         break;
       }
       case 'saveTheme': {
@@ -195,6 +210,8 @@
         // explicitamente; um reload da página não emite nada, então o grind retoma.
         const { alp_grind = {} } = await chrome.storage.local.get('alp_grind');
         let active = alp_grind.active;
+        // v0.17.0: começou a rodar (Iniciar, atalho, popup) com versão urgente pendente → pausa na hora
+        if (urgent && data.running) { send('pause'); }
         if (data.running === 'grind') startBeat(); else if (data.running === null && data.was === 'grind') await stopBeat();
         if (data.running === 'grind') active = true;
         // v0.12.7: só o Parar desliga; o grind terminar sozinho não (completo já zera em grindDone)
@@ -244,6 +261,6 @@
   pushLang();
   // o script da página carrega antes da ponte e o 'ready' dele se perde: manda os dados assim mesmo.
   // v0.16.0: o estado da atualização também (antes só ia no 'ready', e o aviso não aparecia ao abrir a página)
-  setTimeout(() => { hydrate(); pushUpdate(); }, 300);
+  setTimeout(() => { hydrate(); pushUpdate(); softCheck(); }, 300);
   maybeResume();
 })();

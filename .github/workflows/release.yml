@@ -44,7 +44,7 @@ jobs:
             4. **Firefox 140+:** click **midas-${{ github.event.release.tag_name }}.xpi** below if this release has it (signed by Mozilla, updates itself); otherwise use `about:debugging` → *Load Temporary Add-on*.
 
             ### Update
-            Midas shows a gold card when a new version is out. Click **Update**, extract the new zip **over the same folder**, and it reloads itself within a minute.
+            Midas shows a box on the Duolingo page as soon as a new version is out. Click **Update**, extract the new zip **over the same folder**, and it reloads itself within a minute.
         run: |
           gh release upload "$TAG" "midas-$TAG.zip" --clobber
           gh release view "$TAG" --json body -q .body > old.md

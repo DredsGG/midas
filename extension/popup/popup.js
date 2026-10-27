@@ -54,7 +54,7 @@ const render = (st) => {
       : T('pop.complete');
   }
   const log = (st.alp_log || []).slice(-150)
-    .map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`)
+    .map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${String(l.msg).replace(/\/users\/\d+/g, '/users/…').replace(/\?fields=\S+/g, '')}`)
     .join('\n');
   $('log').textContent = log || T('log.empty');
   const unk = Object.keys(st.alp_unknown || {});
@@ -70,8 +70,11 @@ const noteItems = (md) => String(md || '').replace(/^\s*###\s*Install[\s\S]*?\n\
 const renderUpd = () => {
   const u = upd || {}, st = updStatus;
   const stat = typeof st === 'string' ? st : st?.status;
-  const show = !!u.available && u.dismissed !== u.latest;
+  // v0.17.0: "Depois" adia 1 h; versão URGENTE não adia
+  const snoozed = !u.urgent && !!u.snooze && u.snooze.ver === u.latest && Date.now() < u.snooze.until;
+  const show = !!u.available && !snoozed;
   $('upd').hidden = !show;
+  $('upd-later').hidden = !!u.urgent;
   if (show) {
     $('upd-v').innerHTML = `v${esc(u.current || chrome.runtime.getManifest().version)} → <i>v${esc(u.latest)}</i>`;
     const items = noteItems(u.notes);
@@ -79,7 +82,8 @@ const renderUpd = () => {
     $('upd-notes').hidden = !items.length;
     const m = st?.mode === 'xpi' ? T('upd.howFirefox', { v: u.latest }) : stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest }) : stat === 'applying' ? T('upd.applying')
       : st?.mode === 'store' && stat ? T('upd.storeWait') : stat === 'error' ? T('upd.error') : '';
-    $('upd-msg').textContent = m; $('upd-msg').hidden = !m;
+    const mm = u.urgent ? [T('upd.urgent'), m].filter(Boolean).join(' ') : m;
+    $('upd-msg').textContent = mm; $('upd-msg').hidden = !mm;
     $('upd-apply').disabled = stat === 'applying';
   }
   const ju = u.justUpdated;
@@ -96,7 +100,8 @@ const renderUpd = () => {
 };
 const setDismissed = async (v, clearJust) => {
   const { alp_update = {} } = await chrome.storage.local.get('alp_update');
-  await chrome.storage.local.set({ alp_update: { ...alp_update, dismissed: v, ...(clearJust ? { justUpdated: null } : {}) } });
+  const snooze = v && !alp_update.urgent ? { ver: String(v), until: Date.now() + 3600e3 } : (clearJust ? alp_update.snooze ?? null : null);
+  await chrome.storage.local.set({ alp_update: { ...alp_update, snooze, ...(clearJust ? { justUpdated: null } : {}) } });
 };
 
 const refresh = async () => {
@@ -219,7 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
       unk.length ? `New types: ${unk.join(', ')}` : '',
     ].filter(Boolean).join('\n');
-    const log = (st.alp_log || []).slice(-maxLog).map((l) => `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`);
+    const log = (st.alp_log || []).slice(-maxLog).map((l) => `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${String(l.msg).replace(/\/users\/\d+/g, '/users/…').replace(/\?fields=\S+/g, '')}`);
     return { what: String(what || '').trim(), meta, log, diag: `${meta}\n\nLog:\n${log.join('\n')}` };
   };
   const bugUrl = async (what) => {
@@ -257,7 +262,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('upd-guide').addEventListener('click', () => chrome.runtime.sendMessage({ cmd: 'openGuide', hash: '#atualizar' }).catch(() => {}));
   $('upd-later').addEventListener('click', () => setDismissed(upd.latest ?? null));
-  $('upd-seen').addEventListener('click', () => setDismissed(upd.dismissed ?? null, true));
+  $('upd-seen').addEventListener('click', () => setDismissed(null, true));
   $('upd-st').addEventListener('click', () => { if (upd.available) setDismissed(null); });
 
   // v0.15.0 (Firefox): sem a permissão do duolingo.com os scripts não entram na página → aviso + botão

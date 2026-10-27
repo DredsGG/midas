@@ -4,6 +4,18 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.17.0': [
+      'Com o Duolingo aberto, o Midas procura versão nova sozinho: ao abrir, a cada 30 min e quando você volta para a aba.',
+      'O aviso de versão nova aparece na hora, sem recarregar; o X só adia por 1 hora (ou até abrir o navegador de novo).',
+      'Versão marcada como URGENTE: o aviso não fecha e o Midas fica pausado até você atualizar.',
+    ],
+    '0.16.4': [
+      'Os quadros de novidades, versão nova e tutorial ficam centralizados na parte de baixo da tela, sem cobrir o próximo nó do caminho.',
+    ],
+    '0.16.3': [
+      'A janela do Midas não fica mais cortada nem trava o redimensionamento quando o Duolingo responde com erro: o log quebra linhas longas.',
+      'Erros do servidor do Duolingo aparecem no log com o endereço curto, sem o número da sua conta (e ele também não vai mais no Relatar bug).',
+    ],
     '0.16.2': [
       'A recarga por caminho desatualizado só acontece quando a aba mostra outro nó como ativo; com a aba em segundo plano o Midas abre a lição direto, sem perder tempo.',
     ],

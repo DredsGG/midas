@@ -18,6 +18,14 @@
   .ob-back.fixed { position: fixed; }
   /* v0.16.0: no meio da página do Duolingo, sem escurecer nem bloquear o site (só o quadro recebe clique) */
   .ob-back.page { position: absolute; background: transparent; pointer-events: none; padding: 16px; }
+  /* v0.16.4: centralizado na largura, mas na parte de baixo da tela. No caminho o Duolingo põe o
+     próximo nó bem no meio; o quadro no meio cobria justamente o nó que a pessoa ia clicar. */
+  .ob-back.page { align-items: flex-end; padding-bottom: max(24px, 7vh); }
+  .ob-back.page .ob-card { max-height: 36vh; }
+  /* v0.17.0: versão URGENTE: no meio da tela, sem X, com a borda dourada (o grind fica pausado) */
+  .ob-back.page.locked { align-items: center; padding-bottom: 16px; }
+  .ob-back.page.locked .ob-card { max-height: 70vh; border-color: var(--ob-gold, #ffc800); }
+  .ob-urgent { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--ob-gold, #ffc800); } /* topo do quadro abaixo do meio da tela, onde fica o nó */
   .ob-back.page .ob-card { pointer-events: auto; max-width: 380px; box-shadow: 0 16px 48px rgba(0,0,0,.38); }
   .ob-ver { font-size: 12px; font-weight: 800; color: var(--ob-muted, #8fa3ad); font-variant-numeric: tabular-nums; }
   .ob-ver i { font-style: normal; color: var(--ob-gold, #ffc800); }
@@ -65,9 +73,10 @@
     const { T, version, items } = cur.opts;
     const x = `<button class="ob-x" type="button" data-ob="x" aria-label="✕">✕</button>`;
     if (cur.kind === 'update') {
-      const { from, latest, msg, busy } = cur.opts;
+      const { from, latest, msg, busy, locked } = cur.opts;
       cur.el.innerHTML = `<div class="ob-card" role="dialog" aria-label="${esc(T('upd.newTitle', { v: latest }))}">
-        <div class="ob-h"><div class="ob-t"><b>${esc(T('upd.newTitle', { v: latest }))}</b><small class="ob-ver">v${esc(from || '?')} → <i>v${esc(latest)}</i></small></div>${x}</div>
+        <div class="ob-h"><div class="ob-t"><b>${esc(T('upd.newTitle', { v: latest }))}</b><small class="ob-ver">v${esc(from || '?')} → <i>v${esc(latest)}</i></small></div>${locked ? '' : x}</div>
+        ${locked ? `<p class="ob-urgent">${esc(T('upd.urgent'))}</p>` : ''}
         ${(items || []).length ? `<ul class="ob-news">${items.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>` : ''}
         ${msg ? `<p class="ob-msg">${esc(msg)}</p>` : ''}
         <div class="ob-f"><button class="ob-btn link" type="button" data-ob="guide">${esc(T('upd.guide'))}</button><span class="ob-sp"></span>
@@ -114,15 +123,15 @@
     if (cur) { const prev = cur; cur = null; prev.el.remove(); removeEventListener('keydown', prev.key, true); }
     injectCss(opts.styleRoot || document);
     const el = document.createElement('div');
-    el.className = 'ob-back' + (opts.fixed ? ' fixed' : '') + (opts.page ? ' page' : '');
+    el.className = 'ob-back' + (opts.fixed ? ' fixed' : '') + (opts.page ? ' page' : '') + (opts.locked ? ' locked' : '');
     // só o Esc de verdade (do teclado) fecha; o Midas não manda teclas, mas por garantia
-    const key = (e) => { if (e.key === 'Escape' && e.isTrusted !== false) { e.preventDefault(); e.stopPropagation(); close(); } };
+    const key = (e) => { if (e.key === 'Escape' && e.isTrusted !== false && !cur?.opts?.locked) { e.preventDefault(); e.stopPropagation(); close(); } };
     el.addEventListener('click', (e) => {
       const a = e.target.closest?.('[data-ob]')?.getAttribute('data-ob');
       if (e.target === el) return; // clique fora do quadro não fecha (só X, Esc, Pular ou Entendi)
       if (!a || !cur) return;
       e.stopPropagation();
-      if (a === 'x' || a === 'skip' || a === 'ok') close();
+      if ((a === 'x' || a === 'skip' || a === 'ok') && !cur.opts.locked) close();
       else if (a === 'apply') cur.opts.onApply?.();
       else if (a === 'guide') cur.opts.onGuide?.();
       else if (a === 'next') { cur.step = Math.min(STEPS, cur.step + 1); render(); }
@@ -163,6 +172,7 @@
     open, close, decide, itemsFor, seenAfter, cmpVer, STEPS,
     get isOpen() { return !!cur; },
     get kind() { return cur?.kind || null; },
+    get locked() { return !!cur?.opts?.locked; },
     // troca dados do quadro aberto (ex.: mensagem depois do Atualizar) e redesenha
     set: (patch) => { if (cur) { cur.opts = { ...cur.opts, ...patch }; render(); } },
     refresh: render, // troca de idioma com o quadro aberto

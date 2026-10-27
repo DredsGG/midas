@@ -30,7 +30,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 - **In-page HUD.** A gold crown in the corner of Duolingo opens a draggable, resizable panel (shadow DOM, Duolingo's own colors) with live progress, current lesson controls, settings and log.
 - **Speed presets.** *Rage* (0 ms, as fast as possible), *Legit* (about 2.5 s between actions with human-like variation) or *Manual* (pick your own delay and humanizing).
 - **PT / EN / ES** and **light / dark** themes, shared between the HUD and the popup. The first run follows the browser language (anything other than Portuguese or Spanish falls back to English); the flags in the HUD and popup header switch it.
-- **First-run tutorial and what's new.** A 5-step tutorial on first install, *What's new in vX.Y.Z* once per version (skipping versions shows every change in between), and *New version vX.Y.Z* with a summary and an **Update** button. They show up by themselves as a box in the middle of the Duolingo page, with no dark overlay, so the site stays clickable and a running grind isn't affected. **?** in the HUD and popup header reopens the tutorial.
+- **First-run tutorial and what's new.** A 5-step tutorial on first install, *What's new in vX.Y.Z* once per version (skipping versions shows every change in between), and *New version vX.Y.Z* with a summary and an **Update** button. They show up by themselves as a box at the bottom center of the Duolingo page (it never covers the next node on the path), with no dark overlay, so the site stays clickable and a running grind isn't affected. **?** in the HUD and popup header reopens the tutorial.
 - **Report a bug.** A bug button next to *Check for updates* (HUD and popup) opens a card where you describe what happened. It attaches a diagnostic with no account data (version, browser, grind state and speed, current node, progress, recent log lines, never your user, e-mail, token or cookies) and opens a prefilled GitHub issue, or copies the full report to paste anywhere.
 
 <p align="center">
@@ -71,7 +71,7 @@ Keep Duolingo in its **own visible window** while grinding: Chrome throttles tim
 
 ## Updates
 
-Midas checks this repo's releases when the browser starts, every 6 hours and when you press **Check for updates** (bottom of the HUD and the popup). When there's a new version, a box in the middle of the Duolingo page shows what changed (from `extension/src/changelog/`, in your language). Click **Update** to download the zip, extract it **over the same folder**, and within a minute Midas notices the new files and reloads itself together with the Duolingo tab; a running Auto Grind keeps going.
+While Duolingo is open, Midas checks this repo's releases by itself: when the page opens, every 30 minutes and whenever you come back to the tab (at most once every 10 minutes); **Check for updates** (bottom of the HUD and the popup) is just a backup. When there's a new version, a box shows up right away, without reloading, with what changed (from `extension/src/changelog/`, in your language). The ✕ only postpones it for 1 hour (or until you open the browser again). A release marked **URGENTE** (for a serious bug) shows the box without ✕ and pauses Midas until you update. Click **Update** to download the zip, extract it **over the same folder**, and within a minute Midas notices the new files and reloads itself together with the Duolingo tab; a running Auto Grind keeps going.
 
 ## How it's built
 

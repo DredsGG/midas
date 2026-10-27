@@ -43,6 +43,10 @@
     manual: { label: 'Manual' },
   };
   const presetOf = (c) => c?.preset || (c && c.delay === 0 && !c.humanize ? 'rage' : c && c.delay === 2500 && c.humanize ? 'legit' : 'manual');
+  // v0.17.0 (regra 14 revisada): o X só adia por 1 h (ou até abrir o navegador de novo); versão URGENTE não adia
+  const urgentNow = () => !!(state.upd?.available && state.upd?.urgent);
+  const snoozed = (u) => !u.urgent && !!u.snooze && u.snooze.ver === u.latest && Date.now() < u.snooze.until;
+  const scrub = (m) => String(m).replace(/\/users\/\d+/g, '/users/…').replace(/\?fields=\S+/g, '');
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   const CROWN = `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 11l6 5 6-9 6 9 6-5-2.5 13h-19z" fill="rgb(var(--color-bee,255,199,0))"/><path d="M6.5 24h19v3h-19z" fill="rgb(var(--color-bee,255,199,0))" opacity=".75"/><circle cx="16" cy="6" r="2" fill="rgb(var(--color-bee,255,199,0))"/><circle cx="3.5" cy="10" r="1.8" fill="rgb(var(--color-bee,255,199,0))"/><circle cx="28.5" cy="10" r="1.8" fill="rgb(var(--color-bee,255,199,0))"/></svg>`;
@@ -223,7 +227,7 @@
   details summary::-webkit-details-marker { display: none; }
   details summary::after { content: "▾"; color: var(--hare); }
   details[open] summary::after { content: "▴"; }
-  pre { margin: 10px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; font: 11px/1.45 ui-monospace, Consolas, monospace; color: var(--wolf); }
+  pre { margin: 10px 0 0; max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.45 ui-monospace, Consolas, monospace; color: var(--wolf); }
   /* "lv-": a classe "info" do log colidia com o botão "i" de ajuda (v0.9.0) */
   pre .lv-warn { color: var(--bee); } pre .lv-error { color: var(--cardinal); }
   .unk { margin-top: 8px; font-size: 11px; color: var(--hare); }
@@ -530,7 +534,7 @@
         : st?.mode === 'store' && stat ? T('upd.storeWait')
         : stat === 'error' ? T('upd.error') : '';
     };
-    const updOpts = () => ({ from: state.upd.current || state.version, latest: state.upd.latest, items: updItems(), msg: updMsg(),
+    const updOpts = () => ({ from: state.upd.current || state.version, latest: state.upd.latest, items: updItems(), msg: updMsg(), locked: urgentNow(),
       busy: (typeof state.updStatus === 'string' ? state.updStatus : state.updStatus?.status) === 'applying' });
     const showUpd = () => {
       const ob = OB(); const u = state.upd || {};
@@ -538,15 +542,19 @@
       ob.open({ kind: 'update', mountIn: layer, styleRoot: shadow, page: true, T, version: state.version, ...updOpts(),
         onApply: () => { state.updStatus = 'applying'; ob.set(updOpts()); toBridge('updApply'); },
         onGuide: () => toBridge('openGuide', '#atualizar'),
-        onClose: () => { state.upd.dismissed = state.upd.latest; state.updStatus = null; toBridge('updDismiss', state.upd.latest); schedule(); setTimeout(maybeOnboard, 600); } });
+        onClose: () => { state.upd.snooze = { ver: state.upd.latest, until: Date.now() + 3600e3 }; state.updStatus = null; toBridge('updDismiss', state.upd.latest); schedule(); setTimeout(maybeOnboard, 600); } });
       schedule();
     };
-    const wantUpd = () => { const u = state.upd || {}; return !!u.available && !!u.latest && u.dismissed !== u.latest; };
+    const wantUpd = () => { const u = state.upd || {}; return !!u.available && !!u.latest && !snoozed(u); };
     // a pessoa fazendo uma lição sozinha (Midas parado) não leva um quadro por cima: espera ela sair da lição
     const inManualLesson = () => !state.running && /^\/(lesson|practice|legendary|lexeme-practice|alphabets\/|characters\/|.*\/(lesson|practice))/.test(location.pathname);
     maybeOnboard = () => {
       const ob = OB();
       if (!ob || !state.seenLoaded || !state.version) return;
+      // versão URGENTE passa na frente de tudo (tutorial, novidades, lição feita à mão) e não fecha
+      if (urgentNow() && !(ob.isOpen && ob.kind === 'update' && ob.locked)) return showUpd();
+      // atualizou (ou o Release sumiu): o quadro de versão nova sai sozinho
+      if (ob.isOpen && ob.kind === 'update' && !state.upd?.available) { ob.close(); return; }
       if (ob.isOpen) { if (ob.kind === 'update') ob.set(updOpts()); return; }
       if (inManualLesson()) return;
       const k = ob.decide(state.seen, state.version);
@@ -559,7 +567,7 @@
     const toBridge = (type, data) => document.dispatchEvent(new CustomEvent('alp:out', { detail: { type, data } }));
     $('[data-a="updCheck"]').addEventListener('click', () => { state.updStatus = 'checking'; render(); toBridge('updCheck'); });
     $('[data-a="updApply"]').addEventListener('click', () => { state.updStatus = 'applying'; render(); toBridge('updApply'); });
-    $('[data-a="updLater"]').addEventListener('click', () => { state.upd.dismissed = state.upd.latest; state.updStatus = null; render(); toBridge('updDismiss', state.upd.latest); });
+    $('[data-a="updLater"]').addEventListener('click', () => { state.upd.snooze = { ver: state.upd.latest, until: Date.now() + 3600e3 }; state.updStatus = null; render(); toBridge('updDismiss', state.upd.latest); });
     // relatar bug: monta o relatório, abre o GitHub já preenchido ou copia
     const bugCard = $('.bug'), bugWhat = $('[data-s="bugWhat"]');
     const fillDiag = () => { $('[data-s="bugDiag"]').textContent = bugReport('').diag; };
@@ -580,8 +588,8 @@
       b.textContent = T(ok ? 'bug.copied' : 'log.failed'); setTimeout(() => (b.textContent = T('bug.copy')), 1600);
     });
     $('[data-a="updGuide"]').addEventListener('click', () => toBridge('openGuide', '#atualizar'));
-    $('[data-a="updSeen"]').addEventListener('click', () => { state.upd.justUpdated = null; render(); toBridge('updDismiss', state.upd.dismissed ?? null); });
-    $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.dismissed = null; render(); toBridge('updDismiss', null); if (!OB()?.isOpen) showUpd(); });
+    $('[data-a="updSeen"]').addEventListener('click', () => { state.upd.justUpdated = null; render(); toBridge('updJustSeen'); });
+    $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.snooze = null; render(); toBridge('updDismiss', null); if (!OB()?.isOpen) showUpd(); });
     $('[data-a="theme"]').addEventListener('click', () => {
       const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
       setTheme(next);
@@ -721,7 +729,7 @@
     // v0.14.4: o <pre> do relatório de bug (v0.14.0) vinha antes e "$('pre')" pegava ele — o log sumia
     const pre = $('details[data-a="log"] pre');
     pre.innerHTML = state.logs.slice(-200).map((l) =>
-      `<span class="lv-${l.level}">${new Date(l.t).toLocaleTimeString(I18N.locale)} ${esc(l.msg)}</span>`).join('\n') || esc(T('log.empty'));
+      `<span class="lv-${l.level}">${new Date(l.t).toLocaleTimeString(I18N.locale)} ${esc(scrub(l.msg))}</span>`).join('\n') || esc(T('log.empty'));
     pre.scrollTop = pre.scrollHeight;
     paintTheme();
     $('.stale').hidden = !state.stale;
@@ -752,9 +760,11 @@
       state.unknown.size ? `New types: ${[...state.unknown].join(', ')}` : '',
     ].filter(Boolean).join('\n');
     const log = state.logs.slice(-maxLog).map((l) =>
-      `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`);
+      `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${scrub(l.msg)}`);
     return { what: String(what || '').trim(), meta, log, diag: `${meta}\n\nLog:\n${log.join('\n')}` };
   };
+  // v0.16.3: log antigo pode ter o número da conta num endereço da API: sai do relato
+  // (scrub definido no topo)
   // relato pré-preenchido no GitHub; o log é cortado do começo até o endereço caber
   const bugUrl = (what) => {
     const r = bugReport(what);
@@ -773,7 +783,8 @@
   const renderUpd = () => {
     const u = state.upd || {}, st = state.updStatus;
     const stat = typeof st === 'string' ? st : st?.status;
-    const show = !!u.available && u.dismissed !== u.latest && OB()?.kind !== 'update'; // o quadro do meio já mostra
+    const show = !!u.available && !snoozed(u) && OB()?.kind !== 'update'; // o quadro do meio já mostra
+    $('[data-a="updLater"]').hidden = urgentNow();
     $('.panel .upd').hidden = !show;
     $('.fab').classList.toggle('has-upd', !!u.available);
     if (show) {

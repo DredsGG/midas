@@ -3,6 +3,18 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.17.0': [
+      'With Duolingo open, Midas looks for a new version by itself: when it opens, every 30 minutes and when you come back to the tab.',
+      'The new version notice shows up right away, without reloading; the X only postpones it for 1 hour (or until you open the browser again).',
+      'Version marked URGENT: the notice can\'t be closed and Midas stays paused until you update.',
+    ],
+    '0.16.4': [
+      'The What\'s new, new version and tutorial boxes now sit centered at the bottom of the screen, without covering the next node on the path.',
+    ],
+    '0.16.3': [
+      'The Midas window no longer gets cut off or stops resizing when Duolingo answers with an error: the log wraps long lines.',
+      'Duolingo server errors show up in the log with a short address, without your account number (and it no longer goes into Report a bug).',
+    ],
     '0.16.2': [
       'The out-of-date path reload only happens when the tab shows a different node as active; with the tab in the background Midas opens the lesson directly, without wasting time.',
     ],
