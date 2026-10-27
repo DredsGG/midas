@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Midas",
-  "version": "0.14.4",
+  "version": "0.16.2",
   "description": "__MSG_appDesc__",
   "permissions": [
     "storage",
@@ -11,7 +11,10 @@
     "https://www.duolingo.com/*"
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "scripts": [
+      "src/background.js"
+    ]
   },
   "action": {
     "default_popup": "popup/popup.html",
@@ -35,7 +38,11 @@
       ],
       "js": [
         "src/i18n.js",
+        "src/changelog/pt.js",
+        "src/changelog/en.js",
+        "src/changelog/es.js",
         "src/main.js",
+        "src/onboard.js",
         "src/hud.js"
       ],
       "world": "MAIN",
@@ -51,5 +58,17 @@
       "run_at": "document_idle"
     }
   ],
-  "default_locale": "en"
+  "default_locale": "en",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "midas@dredsgg",
+      "strict_min_version": "140.0",
+      "update_url": "https://raw.githubusercontent.com/DredsGG/midas/main/firefox/updates.json",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  }
 }

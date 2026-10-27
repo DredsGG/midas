@@ -1,8 +1,9 @@
 name: Release
 
-# Publish a GitHub Release whose tag is vX.Y.Z (same as "version" in
-# extension/manifest.json). This job builds the ready-to-install zip
-# (manifest.json at the root) and attaches it to that release.
+# Publish a GitHub Release whose tag is vX.Y.Z (same as "version" in extension/manifest.json).
+# This job attaches midas-vX.Y.Z.zip (Chrome, Edge, Brave, Opera GX: manifest.json at the root) and,
+# only when the repo has the secrets AMO_JWT_ISSUER and AMO_JWT_SECRET, midas-vX.Y.Z.xpi signed by Mozilla
+# ("unlisted", self-distributed) plus firefox/updates.json on main (the update_url Firefox reads).
 on:
   release:
     types: [published]
@@ -16,6 +17,8 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name }}
       GH_TOKEN: ${{ github.token }}
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +40,8 @@ jobs:
             ### Install
             1. Download **midas-${{ github.event.release.tag_name }}.zip** below and extract it to a folder you'll keep (e.g. `Documents\Midas`).
             2. Open **COMO-INSTALAR.html** in that folder: a step-by-step guide in Portuguese, English and Spanish.
-            3. Short version: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick the folder that has `manifest.json`.
+            3. Short version: open the extensions page (`chrome://extensions`, `edge://extensions`, `brave://extensions` or `opera://extensions`) → turn on **Developer mode** → **Load unpacked** → pick the folder that has `manifest.json`.
+            4. **Firefox 140+:** click **midas-${{ github.event.release.tag_name }}.xpi** below if this release has it (signed by Mozilla, updates itself); otherwise use `about:debugging` → *Load Temporary Add-on*.
 
             ### Update
             Midas shows a gold card when a new version is out. Click **Update**, extract the new zip **over the same folder**, and it reloads itself within a minute.
@@ -46,3 +50,26 @@ jobs:
           gh release view "$TAG" --json body -q .body > old.md
           { printf '%s\n\n' "$NOTES"; cat old.md; } > notes.md
           gh release edit "$TAG" --notes-file notes.md
+
+      - name: Sign for Firefox (unlisted, self-distributed)
+        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        run: |
+          npx --yes web-ext@8 sign --channel=unlisted --source-dir extension --artifacts-dir xpi \
+            --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" --approval-timeout 900000
+          f="$(ls xpi/*.xpi | head -1)"; cp "$f" "midas-$TAG.xpi"
+          gh release upload "$TAG" "midas-$TAG.xpi" --clobber
+
+      - name: Point Firefox updates at the new .xpi (firefox/updates.json on main)
+        if: ${{ env.AMO_JWT_ISSUER != '' && env.AMO_JWT_SECRET != '' }}
+        run: |
+          git fetch origin main && git checkout -B main origin/main
+          mkdir -p firefox
+          jq -n --arg v "${TAG#v}" --arg u "https://github.com/DredsGG/midas/releases/download/$TAG/midas-$TAG.xpi" \
+            '{addons: {"midas@dredsgg": {updates: [{version: $v, update_link: $u}]}}}' > firefox/updates.json
+          git -c user.name="André Miller Fleck" -c user.email="217871659+DredsGG@users.noreply.github.com" \
+            commit -am "firefox: updates.json → $TAG" || exit 0
+          git push origin main
+
+      - name: No Firefox signing keys
+        if: ${{ env.AMO_JWT_ISSUER == '' || env.AMO_JWT_SECRET == '' }}
+        run: echo "::notice::AMO_JWT_ISSUER/AMO_JWT_SECRET not set, so only the zip was attached (no signed .xpi)."

@@ -1,4 +1,6 @@
 :root {
+  --ob-card: var(--card); --ob-line: var(--line); --ob-text: var(--text); --ob-muted: var(--muted);
+  --ob-gold: var(--gold); --ob-gold-dark: #e5a800; --ob-gold-ink: var(--gold-ink);
   --bg: #131f24; --card: #1b2b33; --line: #37464f; --text: #f1f7fb; --muted: #8fa3ad;
   --gold: #ffc800; --gold-ink: #3d2f00; --green: #58cc02;
 }
@@ -180,3 +182,11 @@ html[data-theme="light"] .updbtn.bugbtn, html[data-theme="light"] .bug summary {
 
 /* v0.13.5: o atributo hidden vence o display das caixas (.updok tem display:flex) */
 [hidden] { display: none !important; }
+
+/* v0.15.0: "?" (Como usar) no cabeçalho e aviso de permissão do site (Firefox) */
+.howto { flex: none; width: 28px; height: 28px; border-radius: 9px; border: 2px solid var(--line); background: transparent;
+  color: var(--text); font: 800 14px/1 system-ui, sans-serif; cursor: pointer; padding: 0; }
+.howto:hover { border-color: var(--gold); color: var(--gold); }
+.perm { border-color: #ff4b4b; }
+.perm b { color: #ff4b4b; }
+.perm p { margin: 6px 0 8px; }

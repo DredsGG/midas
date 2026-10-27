@@ -77,7 +77,7 @@ const renderUpd = () => {
     const items = noteItems(u.notes);
     $('upd-notes').innerHTML = items.map((x) => `<li>${esc(x)}</li>`).join('');
     $('upd-notes').hidden = !items.length;
-    const m = stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest }) : stat === 'applying' ? T('upd.applying')
+    const m = st?.mode === 'xpi' ? T('upd.howFirefox', { v: u.latest }) : stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest }) : stat === 'applying' ? T('upd.applying')
       : st?.mode === 'store' && stat ? T('upd.storeWait') : stat === 'error' ? T('upd.error') : '';
     $('upd-msg').textContent = m; $('upd-msg').hidden = !m;
     $('upd-apply').disabled = stat === 'applying';
@@ -112,6 +112,7 @@ const applyI18n = () => {
   document.querySelectorAll('[data-i18n]').forEach((el) => (el.textContent = T(el.dataset.i18n)));
   document.querySelectorAll('[data-i18n-ph]').forEach((el) => (el.placeholder = T(el.dataset.i18nPh)));
   $('copy').title = T('log.copyTitle');
+  document.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = T(el.dataset.i18nTitle); el.setAttribute('aria-label', el.title); });
   document.querySelectorAll('button.info').forEach((b) => b.setAttribute('aria-label', T('help.label')));
   if (applyI18n.wired) return; // os balões só são ligados uma vez (troca de idioma reaplica só os textos)
   applyI18n.wired = true;
@@ -258,6 +259,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('upd-later').addEventListener('click', () => setDismissed(upd.latest ?? null));
   $('upd-seen').addEventListener('click', () => setDismissed(upd.dismissed ?? null, true));
   $('upd-st').addEventListener('click', () => { if (upd.available) setDismissed(null); });
+
+  // v0.15.0 (Firefox): sem a permissão do duolingo.com os scripts não entram na página → aviso + botão
+  const DUO = 'https://www.duolingo.com/*';
+  const checkPerm = async () => {
+    let ok = true;
+    try { ok = await chrome.permissions.contains({ origins: [DUO] }); } catch { /* sem a API: segue */ }
+    $('perm').hidden = ok;
+  };
+  $('perm-btn').addEventListener('click', async () => {
+    let ok = false;
+    try { ok = await chrome.permissions.request({ origins: [DUO] }); } catch { /* recusado */ }
+    if (!ok) $('perm-msg').textContent = T('perm.denied');
+    await checkPerm();
+  });
+  await checkPerm();
+
+  // v0.15.0 (regra 12): tutorial na 1ª abertura, novidades depois de cada atualização, "?" reabre
+  const OB = globalThis[Symbol.for('alp.onboard')];
+  const VER = chrome.runtime.getManifest().version;
+  const showOb = async (kind) => {
+    if (!OB) return;
+    const { alp_seen } = await chrome.storage.local.get('alp_seen');
+    const items = kind === 'news' ? OB.itemsFor(VER, I18N.lang, alp_seen?.news) : null;
+    const save = (k) => chrome.storage.local.set({ alp_seen: OB.seenAfter(k, VER, alp_seen) });
+    if (kind === 'news' && !items) return save('news');
+    OB.open({ kind, mountIn: document.body, styleRoot: document, fixed: true, T, version: VER, items, onClose: save });
+  };
+  $('howto').addEventListener('click', () => showOb('tutorial'));
+  I18N.onChange?.(() => { if (OB?.isOpen) OB.refresh(); });
+  {
+    const { alp_seen } = await chrome.storage.local.get('alp_seen');
+    const k = OB?.decide(alp_seen, VER);
+    if (k) showOb(k);
+  }
 
   chrome.storage.onChanged.addListener(refresh);
   await refresh();

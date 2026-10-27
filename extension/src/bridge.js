@@ -1,8 +1,16 @@
 // Midas — ponte (mundo ISOLATED): chrome.* ⇄ script da página via CustomEvent.
 (() => {
   const DEFAULTS = { delay: 0, humanize: false, preset: 'rage', debug: false };
-  const send = (cmd, data) =>
-    document.dispatchEvent(new CustomEvent('alp:in', { detail: { cmd, data } }));
+  // v0.15.0 (Firefox): objeto criado aqui (mundo isolado) chega à página sem acesso às propriedades.
+  // cloneInto (só existe no Firefox) copia o detail para a página; no Chromium o objeto passa direto.
+  const toPage = (o) => (typeof cloneInto === 'function' ? cloneInto(o, document.defaultView) : o);
+  const fire = (name, detail) => document.dispatchEvent(new window.CustomEvent(name, { detail: toPage(detail) }));
+  // e o contrário: no Firefox o detail vindo da página chega embrulhado (Xray); copia para um objeto nosso
+  const fromPage = (d) => {
+    if (!d || typeof d !== 'object') return d;
+    try { return JSON.parse(JSON.stringify(d.wrappedJSObject || d)); } catch { return d; }
+  };
+  const send = (cmd, data) => fire('alp:in', { cmd, data });
 
   // Depois do ↻ em chrome://extensions, esta ponte (da versão antiga) continua viva na aba
   // aberta, mas o chrome.* dela morre: qualquer chamada dá "Extension context invalidated".
@@ -13,7 +21,7 @@
     if (dead) return;
     dead = true;
     document.removeEventListener('alp:out', onOut);
-    document.dispatchEvent(new CustomEvent('alp:out', { detail: { type: 'stale' } }));
+    fire('alp:out', { type: 'stale' });
   };
   const safe = (fn) => async (...a) => {
     if (dead) return;
@@ -39,12 +47,13 @@
   });
 
   // v0.13.0: atualizações (o service worker procura no GitHub; aqui só leva e traz para a HUD)
-  const toHud = (type, data) => document.dispatchEvent(new CustomEvent('alp:out', { detail: { type, data } }));
+  const toHud = (type, data) => fire('alp:out', { type, data });
+  let askedCheck = false;
   const pushUpdate = safe(async () => {
     const { alp_update } = await chrome.storage.local.get('alp_update');
     toHud('update', alp_update || {});
     // a HUD abriu e a última procura tem mais de 1 h: procura de novo
-    if (!alp_update?.checkedAt || Date.now() - alp_update.checkedAt > 3600e3) chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => {});
+    if (!askedCheck && (!alp_update?.checkedAt || Date.now() - alp_update.checkedAt > 3600e3)) { askedCheck = true; chrome.runtime.sendMessage({ cmd: 'updCheck' }).catch(() => {}); }
   });
 
   // v0.12.9: uma aba só roda o grind. Cada aba tem um id que sobrevive ao reload
@@ -100,8 +109,8 @@
 
   // manda progresso/log salvos para a HUD (ela abre com os dados da última sessão)
   const hydrate = safe(async () => {
-    const { alp_progress, alp_log, alp_unknown } = await chrome.storage.local.get(['alp_progress', 'alp_log', 'alp_unknown']);
-    send('hydrate', { version: chrome.runtime.getManifest().version, progress: alp_progress || null, log: alp_log || [], unknown: alp_unknown || {} });
+    const { alp_progress, alp_log, alp_unknown, alp_seen } = await chrome.storage.local.get(['alp_progress', 'alp_log', 'alp_unknown', 'alp_seen']);
+    send('hydrate', { version: chrome.runtime.getManifest().version, progress: alp_progress || null, log: alp_log || [], unknown: alp_unknown || {}, seen: alp_seen || null });
   });
 
   // log circular + progresso → storage (o popup lê daqui)
@@ -116,7 +125,7 @@
   });
 
   const onOut = safe(async (e) => {
-    const { type, data } = e.detail || {};
+    const { type, data } = fromPage(e.detail) || {};
     switch (type) {
       case 'ready': {
         await pushConfig();
@@ -149,6 +158,11 @@
       }
       case 'saveTheme': {
         await chrome.storage.local.set({ alp_theme: data });
+        break;
+      }
+      case 'saveSeen': {
+        // v0.15.0: tutorial/novidades vistos (vale para HUD e popup)
+        if (data && typeof data === 'object') await chrome.storage.local.set({ alp_seen: { tutorial: !!data.tutorial, news: String(data.news || '') } });
         break;
       }
       case 'saveLang': {
@@ -228,6 +242,8 @@
 
   pushConfig();
   pushLang();
-  setTimeout(hydrate, 300); // o script da página pode ter carregado antes da ponte
+  // o script da página carrega antes da ponte e o 'ready' dele se perde: manda os dados assim mesmo.
+  // v0.16.0: o estado da atualização também (antes só ia no 'ready', e o aviso não aparecia ao abrir a página)
+  setTimeout(() => { hydrate(); pushUpdate(); }, 300);
   maybeResume();
 })();

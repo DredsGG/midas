@@ -20,7 +20,10 @@
     unknown: new Set(),
     ui: { open: true, logOpen: false, x: null, y: null, ...loadUi() },
     upd: {}, updStatus: null, // alp_update (do service worker) + estado do último clique
+    seen: null, seenLoaded: false, // v0.15.0: alp_seen (tutorial e novidades já vistos)
   };
+  const OB = () => window[Symbol.for('alp.onboard')];
+  let maybeOnboard = () => {}; // definida no build() (precisa do shadow DOM)
 
   const fmtDur = (ms) => {
     if (!ms || !isFinite(ms)) return '–';
@@ -51,6 +54,9 @@
 
   const CSS = `
   :host { all: initial; }
+  /* v0.16.0 (regra 14): camada do tamanho da tela para os quadros do meio (tutorial, novidades, versão nova).
+     Não recebe clique: o Duolingo continua usável em volta; só o quadro em si é clicável. */
+  .wrap.layer { inset: 0; pointer-events: none; z-index: 2147483001; }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   .wrap {
@@ -64,6 +70,8 @@
     --owl: rgb(var(--color-owl, 147,211,51));
     --bee: rgb(var(--color-bee, 255,199,0));
     --cardinal: #ff4b4b;
+    --ob-card: var(--snow); --ob-line: var(--swan); --ob-text: var(--eel); --ob-muted: var(--wolf);
+    --ob-gold: var(--bee); --ob-gold-dark: rgb(229,168,0); --ob-gold-ink: #3d2f00;
     position: fixed; z-index: 2147483000;
     font-family: duolingo-sans, "din-round", "Nunito", system-ui, sans-serif;
     color: var(--eel); font-size: 14px; line-height: 1.35;
@@ -287,7 +295,7 @@
   .upd-st { font-size: 11px; font-weight: 700; color: var(--hare); }
   .upd-st.new { color: var(--bee); cursor: pointer; text-decoration: underline dotted; }
   .wrap[data-theme="light"] .upd-st.new { color: var(--gold-text); }
-  .fab.upd .dot { background: var(--macaw); }
+  .fab.has-upd .dot { background: var(--macaw); }
   /* relatar bug (v0.14.0) */
   .bug { margin: 12px 12px 0; border-radius: 16px; border: 2px solid var(--macaw); border-bottom-width: 4px;
     background: linear-gradient(180deg, rgba(28,176,246,.12), rgba(28,176,246,.03)); padding: 12px; animation: alp-pop .35s cubic-bezier(.3,1.4,.5,1); }
@@ -326,6 +334,7 @@
     <div class="fab" title="${esc(T('fab.title'))}" data-i18n-title="fab.title">${CROWN}<span class="dot"></span></div>
     <section class="panel" hidden>
       <div class="head">${CROWN}<div class="tblock"><div class="title">Midas</div>${LANG_BTNS()}</div><span class="chip">${tx('chip.stopped')}</span>
+        <button class="icon-btn howto" data-a="howto" type="button" title="${esc(T('tut.help'))}" data-i18n-title="tut.help" aria-label="${esc(T('tut.help'))}" data-i18n-aria="tut.help">?</button>
         <button class="tswitch" data-a="theme" type="button" role="switch" aria-checked="true">${THEME_SWITCH}</button>
         <button class="icon-btn" data-a="close" title="${esc(T('close.title'))}" data-i18n-title="close.title">✕</button></div>
       <div class="stale" hidden><span data-i18n="stale.msg">${esc(T('stale.msg'))}</span><button type="button" data-a="reload" data-i18n="stale.btn">${esc(T('stale.btn'))}</button></div>
@@ -379,13 +388,15 @@
       <div class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span class="by">${tx('credit.by')}</span><a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a><span class="ver" data-s="ver"></span></div>
     </section>
     <div class="tip" role="tooltip" hidden></div>
-  </div>`;
+  </div>
+  <div class="wrap layer"></div>`;
 
-  let host, $;
+  let host, $, shadow;
   const build = () => {
     host = document.createElement('div');
     host.setAttribute('data-alp', '');
     const sr = host.attachShadow({ mode: 'closed' });
+    shadow = sr;
     sr.innerHTML = `<style>${CSS}</style>${HTML()}`;
     $ = (s) => sr.querySelector(s);
     document.documentElement.appendChild(host);
@@ -457,7 +468,7 @@
         }
       });
     }
-    I18N.onChange?.(() => { hideTip(); applyTexts(); });
+    I18N.onChange?.(() => { hideTip(); applyTexts(); if (OB()?.isOpen) OB().refresh(); maybeOnboard(); });
 
     // tamanho: redimensionável pelo canto, lembrado entre páginas
     const panel = $('.panel');
@@ -489,9 +500,61 @@
       $('.panel').hidden = !open;
       $('.fab').hidden = open;
       requestAnimationFrame(place);
+      if (open) maybeOnboard(); // os quadros do meio não dependem do painel (regra 14)
     };
     $('.fab').addEventListener('click', () => { if (!$('.fab').__moved) setOpen(true); $('.fab').__moved = false; });
     $('[data-a="close"]').addEventListener('click', () => setOpen(false));
+    // v0.15.0 (regra 12): tutorial na 1ª abertura, novidades depois de cada atualização, "?" reabre o tutorial
+    const saveSeen = (seen) => { state.seen = seen; document.dispatchEvent(new CustomEvent('alp:out', { detail: { type: 'saveSeen', data: seen } })); };
+    const layer = $('.wrap.layer');
+    const showOb = (kind) => {
+      const ob = OB(); const v = state.version;
+      if (!ob || !v) return;
+      const items = kind === 'news' ? ob.itemsFor(v, I18N.lang, state.seen?.news) : null;
+      if (kind === 'news' && !items) { saveSeen(ob.seenAfter('news', v, state.seen)); return; }
+      ob.open({ kind, mountIn: layer, styleRoot: shadow, page: true, T, version: v, items,
+        onClose: (k) => { saveSeen(ob.seenAfter(k, v, state.seen)); setTimeout(maybeOnboard, 600); } });
+    };
+    // v0.16.0 (regra 14): "Nova versão vX.Y.Z" no meio da página, a cada abertura até atualizar; o X (ou Esc)
+    // esconde até sair uma versão mais nova. O resumo vem do changelog da versão nova, no idioma escolhido.
+    const updItems = () => {
+      const u = state.upd || {};
+      const tr = u.news?.[I18N.lang] || u.news?.en || u.news?.pt;
+      return (tr && tr.length ? tr : noteItems(u.notes)).slice(0, 6);
+    };
+    const updMsg = () => {
+      const u = state.upd || {}, st = state.updStatus, stat = typeof st === 'string' ? st : st?.status;
+      return st?.mode === 'xpi' ? T('upd.howFirefox', { v: u.latest })
+        : stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest })
+        : stat === 'applying' ? T('upd.applying')
+        : st?.mode === 'store' && stat ? T('upd.storeWait')
+        : stat === 'error' ? T('upd.error') : '';
+    };
+    const updOpts = () => ({ from: state.upd.current || state.version, latest: state.upd.latest, items: updItems(), msg: updMsg(),
+      busy: (typeof state.updStatus === 'string' ? state.updStatus : state.updStatus?.status) === 'applying' });
+    const showUpd = () => {
+      const ob = OB(); const u = state.upd || {};
+      if (!ob || !u.latest) return;
+      ob.open({ kind: 'update', mountIn: layer, styleRoot: shadow, page: true, T, version: state.version, ...updOpts(),
+        onApply: () => { state.updStatus = 'applying'; ob.set(updOpts()); toBridge('updApply'); },
+        onGuide: () => toBridge('openGuide', '#atualizar'),
+        onClose: () => { state.upd.dismissed = state.upd.latest; state.updStatus = null; toBridge('updDismiss', state.upd.latest); schedule(); setTimeout(maybeOnboard, 600); } });
+      schedule();
+    };
+    const wantUpd = () => { const u = state.upd || {}; return !!u.available && !!u.latest && u.dismissed !== u.latest; };
+    // a pessoa fazendo uma lição sozinha (Midas parado) não leva um quadro por cima: espera ela sair da lição
+    const inManualLesson = () => !state.running && /^\/(lesson|practice|legendary|lexeme-practice|alphabets\/|characters\/|.*\/(lesson|practice))/.test(location.pathname);
+    maybeOnboard = () => {
+      const ob = OB();
+      if (!ob || !state.seenLoaded || !state.version) return;
+      if (ob.isOpen) { if (ob.kind === 'update') ob.set(updOpts()); return; }
+      if (inManualLesson()) return;
+      const k = ob.decide(state.seen, state.version);
+      if (k) return showOb(k);
+      if (wantUpd()) showUpd();
+    };
+    setInterval(() => maybeOnboard(), 5000); // troca de página (SPA), versão nova achada pelo service worker etc.
+    $('[data-a="howto"]').addEventListener('click', () => showOb('tutorial'));
     $('[data-a="reload"]').addEventListener('click', () => location.reload());
     const toBridge = (type, data) => document.dispatchEvent(new CustomEvent('alp:out', { detail: { type, data } }));
     $('[data-a="updCheck"]').addEventListener('click', () => { state.updStatus = 'checking'; render(); toBridge('updCheck'); });
@@ -518,7 +581,7 @@
     });
     $('[data-a="updGuide"]').addEventListener('click', () => toBridge('openGuide', '#atualizar'));
     $('[data-a="updSeen"]').addEventListener('click', () => { state.upd.justUpdated = null; render(); toBridge('updDismiss', state.upd.dismissed ?? null); });
-    $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.dismissed = null; render(); toBridge('updDismiss', null); });
+    $('.upd-st').addEventListener('click', () => { if (!state.upd.available) return; state.upd.dismissed = null; render(); toBridge('updDismiss', null); if (!OB()?.isOpen) showUpd(); });
     $('[data-a="theme"]').addEventListener('click', () => {
       const next = effectiveTheme() === 'dark' ? 'light' : 'dark';
       setTheme(next);
@@ -590,7 +653,7 @@
   const effectiveTheme = () => state.ui.theme || siteTheme();
   const paintTheme = () => {
     if (!$) return;
-    $('.wrap').dataset.theme = effectiveTheme(); // sem escolha: o tema atual do site
+    for (const w of shadow.querySelectorAll('.wrap')) w.dataset.theme = effectiveTheme(); // sem escolha: o tema atual do site
     const btn = $('[data-a="theme"]');
     const dark = effectiveTheme() === 'dark';
     btn.setAttribute('aria-checked', String(dark)); // ligado = escuro
@@ -710,16 +773,17 @@
   const renderUpd = () => {
     const u = state.upd || {}, st = state.updStatus;
     const stat = typeof st === 'string' ? st : st?.status;
-    const show = !!u.available && u.dismissed !== u.latest;
-    $('.upd').hidden = !show;
-    $('.fab').classList.toggle('upd', !!u.available);
+    const show = !!u.available && u.dismissed !== u.latest && OB()?.kind !== 'update'; // o quadro do meio já mostra
+    $('.panel .upd').hidden = !show;
+    $('.fab').classList.toggle('has-upd', !!u.available);
     if (show) {
       $('.upd-v').innerHTML = `v${esc(u.current || state.version || '?')} → <i>v${esc(u.latest)}</i>`;
       const items = noteItems(u.notes);
       $('.upd-notes').innerHTML = items.map((x) => `<li>${esc(x)}</li>`).join('');
       $('.upd-notes').hidden = !items.length;
       const msg = $('.upd-msg');
-      const m = stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest })
+      const m = st?.mode === 'xpi' ? T('upd.howFirefox', { v: u.latest })
+        : stat === 'downloaded' ? T('upd.howUnpacked', { v: u.latest })
         : stat === 'applying' ? T('upd.applying')
         : st?.mode === 'store' && stat ? T('upd.storeWait')
         : stat === 'error' ? T('upd.error') : '';
@@ -756,12 +820,13 @@
         if (data?.progress && !state.progress) state.progress = data.progress;
         if (Array.isArray(data?.log) && !state.logs.length) state.logs = data.log.slice(-500);
         for (const k of Object.keys(data?.unknown || {})) state.unknown.add(k);
+        if (data && 'seen' in data) { state.seen = data.seen || null; state.seenLoaded = true; setTimeout(() => maybeOnboard(), 400); }
         break;
       case 'config': break; // render relê API().cfg
       case 'theme': setTheme(data); return;
       case 'stale': state.stale = true; break;
-      case 'update': state.upd = { ...(data || {}) }; break;
-      case 'updResult': state.updStatus = data || null; break;
+      case 'update': state.upd = { ...(data || {}) }; setTimeout(() => maybeOnboard(), 0); break;
+      case 'updResult': state.updStatus = data || null; setTimeout(() => maybeOnboard(), 0); break;
       default: return;
     }
     schedule();

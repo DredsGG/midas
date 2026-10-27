@@ -1035,6 +1035,25 @@
       if (attempt) { await go('/practice-hub'); await sleep(900); await go('/learn'); }
       for (let i = 0; i < 20 && !(hit = findActive()); i++) await sleep(300);
     }
+    // v0.16.1: o caminho desta aba pode estar velho. Ex.: outra aba avançou o curso (abriu o baú) e
+    // aqui o nó ativo ainda aparece como o anterior; ir ao Praticar e voltar não relê os dados, e o
+    // grind ficava em looping /practice-hub ⇄ /learn. Recarregar a página traz o caminho certo e o
+    // grind retoma sozinho. Uma vez por nó a cada 10 min; se não resolver, segue pelo endereço direto.
+    // v0.16.2: só quando a página mostra OUTRO nó como ativo (dados velhos). Sem nenhum nó desenhado
+    // (aba em segundo plano) recarregar não adianta: vai direto pelo endereço.
+    const staleOther = () => [...new Set([...$$('[data-test*="skill-path-level-"]'), ...$$(`${S.path} button`)])]
+      .some((n) => { const l = levelOf(n); return l?.state === 'active' && l.id && l.id !== wantId; });
+    if (!hit && wantId && staleOther()) {
+      const KEY = 'alp.staleReload';
+      let st = {};
+      try { st = JSON.parse(sessionStorage.getItem(KEY) || '{}'); } catch { /* sem storage */ }
+      if (st.id !== wantId || Date.now() - (st.at || 0) > 10 * 60e3) {
+        try { sessionStorage.setItem(KEY, JSON.stringify({ id: wantId, at: Date.now() })); } catch { /* idem */ }
+        report(T('log.stalePath'), 'warn');
+        emit('reloading', { fresh: false });
+        await sleep(60000); // a ponte recarrega a página; se não recarregar, segue abaixo
+      }
+    }
     if (!hit) return startByRoute(lvWanted);
     const { node, lv: lvActive } = hit;
     node.scrollIntoView({ block: 'center' });

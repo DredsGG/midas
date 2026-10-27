@@ -9,15 +9,26 @@
 //   cima, ou gravados pela IA), a extensão percebe sozinha em até 1 min e se recarrega — sem ↻.
 // - Depois de recarregar, as abas do Duolingo recarregam e o Auto Grind continua sozinho.
 const REPO = 'DredsGG/midas';
+// v0.15.0: o mesmo arquivo roda como service worker (Chrome, Edge, Brave, Opera GX) e como página de
+// fundo (Firefox, "background.scripts"). Nada de window/DOM aqui.
+const IS_FIREFOX = typeof browser !== 'undefined' && typeof browser.runtime?.getBrowserInfo === 'function';
+const DUO = 'https://www.duolingo.com/*';
 const CHECK_EVERY_MIN = 360;
 const DISK_EVERY_MIN = 1;
 
+// v0.15.0: no Firefox o usuário pode tirar a permissão do duolingo.com em about:addons; sem ela os
+// scripts não entram na página. O popup mostra o aviso e o ícone ganha um "!" vermelho.
+const hasSitePerm = async () => { try { return await chrome.permissions.contains({ origins: [DUO] }); } catch { return true; } };
 const paint = async () => {
   const { alp_running } = await chrome.storage.local.get('alp_running');
-  const text = alp_running === 'grind' ? 'AUTO' : alp_running === 'lesson' ? 'ON' : '';
+  const perm = await hasSitePerm();
+  await chrome.storage.local.set({ alp_perm: perm });
+  const text = !perm ? '!' : alp_running === 'grind' ? 'AUTO' : alp_running === 'lesson' ? 'ON' : '';
   await chrome.action.setBadgeText({ text });
-  await chrome.action.setBadgeBackgroundColor({ color: alp_running === 'grind' ? '#e0a800' : '#58cc02' });
+  await chrome.action.setBadgeBackgroundColor({ color: !perm ? '#ff4b4b' : alp_running === 'grind' ? '#e0a800' : '#58cc02' });
 };
+chrome.permissions?.onAdded?.addListener(paint);
+chrome.permissions?.onRemoved?.addListener(paint);
 
 // "0.12.10" > "0.12.9"
 const cmpVer = (a, b) => {
@@ -39,6 +50,25 @@ const saveUpdate = async (patch) => {
   return next;
 };
 
+// v0.16.0 (regra 14): o resumo do quadro "Nova versão" vem do changelog da versão nova (PT, EN, ES),
+// lido do próprio repo na tag do Release. Só texto: as frases são extraídas, nada é executado.
+const fetchNews = async (ver) => {
+  const out = {};
+  await Promise.all(['pt', 'en', 'es'].map(async (lang) => {
+    try {
+      const r = await fetch(`https://raw.githubusercontent.com/${REPO}/v${ver}/extension/src/changelog/${lang}.js`, { cache: 'no-store' });
+      if (!r.ok) return;
+      const src = await r.text();
+      const head = src.indexOf(`'${ver}': [`);
+      if (head < 0) return;
+      const body = src.slice(head + ver.length + 5, src.indexOf('],', head));
+      const lines = [...body.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1].replace(/\\(.)/g, '$1')).filter(Boolean).slice(0, 6);
+      if (lines.length) out[lang] = lines;
+    } catch { /* sem rede: o quadro usa as notas do Release */ }
+  }));
+  return Object.keys(out).length ? out : null;
+};
+
 const checkUpdate = async () => {
   const cur = current();
   const base = { checkedAt: Date.now(), current: cur, installType: await installType() };
@@ -50,12 +80,15 @@ const checkUpdate = async () => {
     const j = await r.json();
     const latest = String(j.tag_name || '').replace(/^v/i, '');
     const zip = (j.assets || []).find((a) => /\.zip$/i.test(a.name))?.browser_download_url || null;
+    const xpi = (j.assets || []).find((a) => /\.xpi$/i.test(a.name))?.browser_download_url || null;
+    const available = !!latest && cmpVer(latest, cur) > 0;
+    const news = available ? await fetchNews(latest) : null;
     const st = await saveUpdate({
-      ...base, latest, notes: String(j.body || '').slice(0, 4000), page: j.html_url || null, zip,
-      available: !!latest && cmpVer(latest, cur) > 0, error: null,
+      ...base, latest, news, notes: String(j.body || '').slice(0, 4000), page: j.html_url || null, zip, xpi, browser: IS_FIREFOX ? 'firefox' : 'chromium',
+      available, error: null,
     });
     // instalada pela loja + grind rodando sozinho: aplica já (a página recarrega e o grind continua)
-    if (st.available && st.installType === 'normal') {
+    if (st.available && st.installType === 'normal' && !IS_FIREFOX) {
       const { alp_grind } = await chrome.storage.local.get('alp_grind');
       if (alp_grind?.active) await applyUpdate();
     }
@@ -67,6 +100,14 @@ const checkUpdate = async () => {
 
 const applyUpdate = async () => {
   const st = (await chrome.storage.local.get('alp_update')).alp_update || {};
+  if (IS_FIREFOX) {
+    // Firefox: abre o .xpi assinado do Release e o próprio Firefox pede para instalar por cima.
+    // (Com o update_url do manifest ele também se atualiza sozinho, em até um dia.)
+    const url = st.xpi || st.page || `https://github.com/${REPO}/releases/latest`;
+    await chrome.tabs.create({ url, active: true });
+    await saveUpdate({ downloadedAt: Date.now() });
+    return { mode: 'xpi', status: st.xpi ? 'downloaded' : 'page' };
+  }
   if (await installType() === 'normal') {
     // Chrome Web Store: baixa a versão nova e recarrega para aplicar
     const res = await new Promise((ok) => chrome.runtime.requestUpdateCheck((status, details) => ok({ status, details })));
@@ -167,6 +208,10 @@ chrome.runtime.onInstalled.addListener(async (d) => {
   schedule();
   // primeira instalação: abre o guia nos primeiros passos
   if (d.reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('COMO-INSTALAR.html#usar') });
+  // v0.15.0 (regra 12): instalação nova → só o tutorial; atualização → quadro de novidades uma vez
+  const { alp_seen } = await chrome.storage.local.get('alp_seen');
+  if (d.reason === 'install' && !alp_seen) await chrome.storage.local.set({ alp_seen: { tutorial: false, news: current() } });
+  if (d.reason === 'update' && !alp_seen) await chrome.storage.local.set({ alp_seen: { tutorial: true, news: d.previousVersion || '' } });
   if (d.reason === 'update') {
     // aviso "atualizado para vX" na HUD/popup + versão nova já conferida no GitHub
     await saveUpdate({ justUpdated: { from: d.previousVersion || null, to: current(), at: Date.now() }, available: false, current: current() });
