@@ -25,6 +25,14 @@ const send = async (cmd, data) => {
   catch { $('running').textContent = T('pop.reload'); }
 };
 
+// v0.17.2: contagem a cada segundo com o grind rodando
+const fmtLive = (ms) => {
+  if (!ms || !isFinite(ms) || ms <= 0) return '–';
+  const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h ? `${h}h ${String(m).padStart(2, '0')}m ${String(x).padStart(2, '0')}s` : `${m}m ${String(x).padStart(2, '0')}s`;
+};
+let lastEta = null;
+setInterval(() => { const e = lastEta; if (e?.running === 'grind' && e.p?.at) document.getElementById('s-eta').textContent = fmtLive(e.p.etaMs - (Date.now() - e.p.at)); }, 1000);
 const fmtDur = (ms) => {
   if (!ms || !isFinite(ms)) return '–';
   const h = Math.floor(ms / 3.6e6), m = Math.round((ms % 3.6e6) / 6e4);
@@ -48,7 +56,8 @@ const render = (st) => {
     $('bar-fill').style.width = total ? `${(100 * done) / total}%` : '0';
     $('s-leg').textContent = done.toLocaleString(I18N.locale);
     $('s-todo').textContent = left.toLocaleString(I18N.locale);
-    $('s-eta').textContent = fmtDur(p.etaMs);
+    $('s-eta').textContent = st.alp_running === 'grind' && p.at ? fmtLive(p.etaMs - (Date.now() - p.at)) : fmtDur(p.etaMs);
+    lastEta = { p, running: st.alp_running };
     $('current').textContent = p.current
       ? `${T(p.current.mode === 'normal' ? 'mode.lesson' : 'mode.legendary')}: ${T('now.where', { u: p.current.u + 1, n: p.current.li + 1 })} · ${typeName(p.current.type)} · ${p.current.name}`
       : T('pop.complete');

@@ -1138,14 +1138,46 @@
     };
   };
 
-  const progressPayload = (levels, course, target, msPerStep) => {
+  // v0.17.1: ritmo real para a estimativa. Antes valia só a rodada atual (zera a cada recarga, ~a cada
+  // 15-20 min por fala travada e de hora em hora) e começava num chute de 35 s por passo: ficava ~20%
+  // otimista e pulava horas de uma leitura para outra. Agora guarda o total de passos que faltam
+  // (lições + Titãs) a cada 30 s de grind e mede quanto ele caiu na última 1 h 30 (contínuo: a janela
+  // anda junto), com recargas, falas travadas e esperas incluídas. Buraco de mais de 15 min (PC
+  // desligado, grind parado) recomeça. v0.17.2: vale a partir de 10 min de dados; a HUD conta o tempo
+  // a cada segundo e mostra o ritmo medido.
+  const RATE_KEY = 'alp.rate';
+  const rateSample = (steps) => {
+    let h = [];
+    try { h = JSON.parse(localStorage.getItem(RATE_KEY) || '[]'); } catch { /* sem storage */ }
+    const now = Date.now(), last = h[h.length - 1];
+    // parou um tempo, ou o curso mudou (salto grande). Oscilação pequena para cima é normal: o caminho
+    // às vezes volta um passo por alguns segundos (leitura atrasada do servidor) e não pode zerar tudo.
+    if (last && (now - last.t > 15 * 60e3 || steps > last.s + 20)) h = [];
+    if (!h.length || now - h[h.length - 1].t >= 30e3) h.push({ t: now, s: steps });
+    h = h.filter((x) => now - x.t <= 6 * 3.6e6);
+    try { localStorage.setItem(RATE_KEY, JSON.stringify(h)); } catch { /* idem */ }
+    return h;
+  };
+  const PACE_WIN = 90 * 60e3, PACE_MIN = 10 * 60e3;
+  const pace = (h = null) => {
+    if (!h) { try { h = JSON.parse(localStorage.getItem(RATE_KEY) || '[]'); } catch { h = []; } }
+    if (!h.length) return null;
+    const now = h[h.length - 1];
+    const old = h.find((x) => now.t - x.t <= PACE_WIN) || h[0];
+    const ms = now.t - old.t, done = old.s - now.s;
+    return ms >= PACE_MIN && done >= 5 ? { per: ms / done, win: ms, perHour: done / (ms / 3.6e6) } : null; // pouco dado: ritmo da rodada
+  };
+  const etaPer = (steps, h = null) => pace(h)?.per || 0;
+  const progressPayload = (levels, course, target, msPerStep, inGrind = false) => {
     const sum = summarize(levels);
-    const per = msPerStep || 35e3;
+    const pc = inGrind ? pace(rateSample(sum.steps)) : pace();
+    const per = pc?.per || msPerStep || 35e3;
     return {
       ...sum,
       courseId: course?.id || null,
       msPerNode: Math.round(per),
       etaMs: Math.round(per * sum.steps),
+      paceHour: pc ? Math.round(pc.perHour) : null, paceWin: pc ? Math.round(pc.win / 60e3) : null,
       current: target && { u: target.lv.unitIndex, li: target.lv.levelInUnit, type: target.lv.type, name: target.lv.debugName, mode: target.mode },
       skip: grindState.skip,
       at: Date.now(),
@@ -1235,7 +1267,7 @@
       const target = pickTarget(levels, justPassedId, retry);
       justPassedId = null; retry = null;
       const per = grindState.done ? (Date.now() - grindState.startedAt) / grindState.done : 35e3;
-      emit('progress', { ...progressPayload(levels, course, target, per), doneThisRun: grindState.done });
+      emit('progress', { ...progressPayload(levels, course, target, per, true), doneThisRun: grindState.done });
       if (!target) {
         // só é "100%" se não sobrou nó em andamento; se o próximo nó não abre, avisa em vez de mentir
         if (levels.some((l) => l.state === 'active')) {
@@ -1337,7 +1369,7 @@
   // exposto para a ponte / testes
   const api_ = {
     cfg, getStatus, getChallenge, solveCurrent, pressNext, skipChallenge, runLesson, runStory, runSession,
-    fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection,
+    fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
   };
 

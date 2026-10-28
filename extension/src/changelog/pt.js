@@ -4,6 +4,12 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.17.3': [
+      'A estimativa é medida sem parar no ritmo real da última 1 h 30, desce a cada segundo com o grind rodando e mostra o ritmo (passos por hora).',
+    ],
+    '0.17.1': [
+      'A estimativa de tempo agora usa o ritmo real das últimas 3 horas (com recargas e falas travadas) e não pula mais de uma leitura para outra.',
+    ],
     '0.17.0': [
       'Com o Duolingo aberto, o Midas procura versão nova sozinho: ao abrir, a cada 30 min e quando você volta para a aba.',
       'O aviso de versão nova aparece na hora, sem recarregar; o X só adia por 1 hora (ou até abrir o navegador de novo).',

@@ -31,6 +31,14 @@
     if (h >= 48) return `${Math.round(h / 24)} d`;
     return h ? `${h} h ${m} min` : `${Math.max(1, m)} min`;
   };
+  // v0.17.2: com o grind rodando, a estimativa desce a cada segundo (entre um nó e outro) e é
+  // recalculada a cada nó pelo ritmo real; parado, fica o último valor
+  const fmtLive = (ms) => {
+    if (!ms || !isFinite(ms) || ms <= 0) return '–';
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    return h ? `${h}h ${String(m).padStart(2, '0')}m ${String(x).padStart(2, '0')}s` : `${m}m ${String(x).padStart(2, '0')}s`;
+  };
+  let paintEta = () => {};
   // v0.9: textos no idioma do navegador (src/i18n.js)
   const I18N = window[Symbol.for('alp.i18n')] || { t: (k) => k, locale: 'pt-BR' };
   const T = I18N.t;
@@ -407,6 +415,12 @@
 
     // posição (arrastável, lembrada)
     const wrap = $('.wrap');
+    paintEta = () => {
+      const p = state.progress, el = $('[data-s="eta"]');
+      if (!p || !el) return;
+      el.textContent = state.running === 'grind' && p.at ? fmtLive(p.etaMs - (Date.now() - p.at)) : fmtDur(p.etaMs);
+    };
+    setInterval(() => { if (state.running === 'grind' && !$('.panel').hidden) paintEta(); }, 1000);
     const place = () => {
       const { x, y } = state.ui;
       if (x == null || y == null) { wrap.style.right = '20px'; wrap.style.bottom = '20px'; wrap.style.left = wrap.style.top = ''; return; }
@@ -705,11 +719,12 @@
       $('.bar i').style.width = total ? `${(100 * done) / total}%` : '0';
       $('[data-s="leg"]').textContent = nf(done);
       $('[data-s="todo"]').textContent = nf(left);
-      $('[data-s="eta"]').textContent = fmtDur(p.etaMs);
+      paintEta();
       const note = $('.note');
       const bits = [];
       if (p.blocked) bits.push(T('note.blocked', { n: nf(p.blocked) }));
       if (p.skipped) bits.push(T('note.skipped', { n: nf(p.skipped) }));
+      if (p.paceHour) bits.push(T('note.pace', { n: nf(p.paceHour), m: p.paceWin }));
       note.textContent = bits.join(' · ');
       note.hidden = !bits.length;
       const c = p.current;

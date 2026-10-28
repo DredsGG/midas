@@ -3,6 +3,12 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.17.3': [
+      'The estimate is measured continuously at the real pace of the last 90 minutes, counts down every second while the grind runs and shows the pace (steps per hour).',
+    ],
+    '0.17.1': [
+      'The time estimate now uses the real pace of the last 3 hours (reloads and stuck speaking exercises included) and no longer jumps around between readings.',
+    ],
     '0.17.0': [
       'With Duolingo open, Midas looks for a new version by itself: when it opens, every 30 minutes and when you come back to the tab.',
       'The new version notice shows up right away, without reloading; the X only postpones it for 1 hour (or until you open the browser again).',
