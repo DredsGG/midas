@@ -305,7 +305,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 chrome.storage.onChanged.addListener((changes) => { if (changes.alp_running) paint(); });
 // v0.17.0: abrir o navegador de novo desfaz o "adiar" do X (o aviso volta na próxima abertura)
 chrome.runtime.onStartup.addListener(async () => { paint(); schedule(); onBoot(); await saveUpdate({ snooze: null }); checkUpdate(); });
-chrome.runtime.onInstalled.addListener(async (d) => {
+const onInstall = async (d) => {
   paint();
   schedule();
   // primeira instalação: abre o guia nos primeiros passos
@@ -322,8 +322,13 @@ chrome.runtime.onInstalled.addListener(async (d) => {
     if (alp_grind) await chrome.storage.local.set({ alp_grind: { ...alp_grind, skip: {} } });
     // as abas do Duolingo abertas ainda rodam a versão antiga, sem conexão com a extensão:
     // recarregar põe a nova; o Auto Grind retoma sozinho (alp_grind.active fica salvo)
+    // v0.19.0: o lock da aba antiga ainda parece fresco por até 30 s, mas aquela página já não fala com a
+    // extensão (morreu no reload). Sem apagar, a aba recarregada achava "o grind está rodando em outra
+    // aba", ficava parada e só voltava 4 min depois, pela sentinela (visto ao vivo na troca para a v0.19.0).
+    await chrome.storage.local.remove('alp_lock');
     const tabs = await chrome.tabs.query({ url: 'https://www.duolingo.com/*' });
     for (const t of tabs) chrome.tabs.reload(t.id);
   }
   checkUpdate();
-});
+};
+chrome.runtime.onInstalled.addListener(onInstall);

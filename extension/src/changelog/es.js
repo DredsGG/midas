@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.1': [
+      'Después de una actualización, el grind vuelve al instante. Antes, la pestaña podía quedarse quieta hasta 4 min creyendo que otra pestaña seguía corriendo.',
+    ],
     '0.19.0': [
       'Si la pestaña del grind se cierra, el navegador se reinicia o el grind se atasca, Midas lo vuelve a iniciar solo en hasta 10 min, en una pestaña en segundo plano.',
       'Cada reinicio queda en el registro con fecha, hora y motivo.',

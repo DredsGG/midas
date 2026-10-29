@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.1': [
+      'Depois de uma atualização, o grind volta na hora. Antes, a aba podia ficar até 4 min parada achando que outra aba ainda estava rodando.',
+    ],
     '0.19.0': [
       'Se a aba do grind fechar, o navegador reiniciar ou o grind travar, o Midas volta a rodar sozinho em até 10 min, numa aba em segundo plano.',
       'Cada reinício fica no log com data, hora e motivo.',

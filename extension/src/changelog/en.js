@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.1': [
+      'After an update, the grind comes back right away. Before, the tab could sit idle for up to 4 min, thinking another tab was still running.',
+    ],
     '0.19.0': [
       'If the grind tab closes, the browser restarts or the grind gets stuck, Midas starts it again by itself within 10 min, in a background tab.',
       'Every restart is written to the log with date, time and reason.',
