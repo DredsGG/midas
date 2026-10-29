@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.17.3-f5b301)
+![Version](https://img.shields.io/badge/version-0.18.0-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/hud-auto-grind.png" width="420" alt="Midas HUD inside Duolingo: Auto Grind progress with legendary, left and estimate counters, current lesson buttons, speed presets and the live log">
@@ -25,6 +25,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
   - a speaking exercise that can't be skipped makes it leave the lesson and reload; after 3 tries on the same node it moves on and comes back at the hourly restart;
   - a background watchdog reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs;
   - only one Duolingo tab grinds at a time, and when Duolingo asks for a streak goal it picks the highest one.
+  - on a brand-new course it answers Duolingo's welcome questions by itself (lowest level, start from scratch) and goes straight into the first lesson.
   - the HUD shows how long is left: the estimate follows the real pace of the last 90 minutes (reloads and stuck speaking exercises included), counts down every second while the grind runs and shows the pace in steps per hour.
 - **Lesson solver.** 35+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added.
 - **Story solver.** Multiple choice, select phrase, arrange, gap fill, point-to-phrase and match.

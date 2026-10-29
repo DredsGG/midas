@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.18.0': [
+      'New course: Midas answers Duolingo\'s welcome questions by itself (lowest level, start from scratch) and goes straight on with the grind.',
+    ],
     '0.17.3': [
       'The estimate is measured continuously at the real pace of the last 90 minutes, counts down every second while the grind runs and shows the pace (steps per hour).',
     ],

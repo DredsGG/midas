@@ -649,6 +649,31 @@
     const m = norm(el.textContent).replace(/(\d)[.,](?=\d{3}\b)/g, '$1').match(/\d+/);
     return m ? +m[0] : -1;
   };
+  // v0.18.0 (pedido do André, 29/10): boas-vindas de curso novo. O Duolingo abre perguntas antes da
+  // 1ª lição (gaveta no /learn ou tela cheia na lição): "Quanto você sabe?" → "Começar do zero /
+  // Encontrar o meu nível" (às vezes também motivo e meta diária). Conferido ao vivo no francês:
+  // opções role="radio" dentro de role="radiogroup" e o botão data-test="funboarding-continue-button"
+  // (desligado até escolher). Escolhe sempre a 1ª opção (nível mais baixo, começar do zero) e segue.
+  const FUN_BTN = '[data-test="funboarding-continue-button"]';
+  const funboardingOn = () => $$(FUN_BTN).some(isVisible);
+  const handleFunboarding = async () => {
+    let steps = 0;
+    for (let i = 0; i < 20 && funboardingOn(); i++) {
+      const btn = $$(FUN_BTN).filter(isVisible).pop();
+      // a tela desliza: a pergunta anterior continua no DOM, já marcada; vale a última sem resposta
+      const group = $$('[role="radiogroup"]').filter(isVisible).filter((g) => !g.querySelector('[role="radio"][aria-checked="true"]')).pop();
+      const opt = group?.querySelector('[role="radio"]') ||
+        (!isEnabled(btn) ? $$('[role="checkbox"]').filter(isVisible).find((c) => c.getAttribute('aria-checked') !== 'true') : null);
+      if (opt) {
+        clickEl(opt) || opt.click();
+        report(T('log.funboarding', { opt: norm(opt.textContent).slice(0, 60) }));
+        await sleep(500);
+      }
+      if (isEnabled(btn)) { btn.click(); steps++; }
+      await sleep(1300);
+    }
+    return steps > 0;
+  };
   const handleStreakGoal = async () => {
     const opts = $$(STREAK_OPT).filter(isVisible);
     if (!opts.length) return false;
@@ -708,6 +733,7 @@
     while (!token.stop) {
       if (Date.now() - t0 > timeoutMs) { report(T('log.lessonTimeout'), 'warn'); return 'timeout'; }
       if ($(STREAK_OPT) && (await handleStreakGoal())) { idleSince = Date.now(); continue; }
+      if (funboardingOn() && (await handleFunboarding())) { idleSince = Date.now(); continue; }
       if (gone()) return 'done';
       const status = getStatus();
       if (status !== 'GUESSING') answeredCh = null;
@@ -908,6 +934,7 @@
     while (!token.stop) {
       if (Date.now() - t0 > timeoutMs) { report(T('log.storyTimeout'), 'warn'); return 'timeout'; }
       if ($(STREAK_OPT) && (await handleStreakGoal())) continue;
+      if (funboardingOn() && (await handleFunboarding())) continue;
       if (gone()) return 'done';
       const done = $(SB.done);
       const start = $(SB.start);
@@ -1018,6 +1045,14 @@
   const startActiveNode = async (wantId = null, lvWanted = null) => {
     await go('/learn');
     for (let i = 0; i < 20 && !$(S.path); i++) await sleep(300);
+    // curso novo: a gaveta de boas-vindas cobre o caminho; responde antes de procurar o nó
+    for (let i = 0; i < 6 && !funboardingOn(); i++) { if (i > 1 && $(S.path)) break; await sleep(400); }
+    if (funboardingOn() && (await handleFunboarding())) {
+      await sleep(1500);
+      if (/^\/lesson/.test(location.pathname)) return true; // "Começar do zero" já abre a 1ª lição
+      await go('/learn');
+      for (let i = 0; i < 20 && !$(S.path); i++) await sleep(300);
+    }
     // o baú não tem data-test (só aria-label "Abrir baú"): procura por todos os botões do caminho
     const levelOf = (n) => walkUp(fiberOf(n), (f) => f.memoizedProps?.level || undefined, 10) ||
       fiberOf(n)?.child?.memoizedProps?.level;

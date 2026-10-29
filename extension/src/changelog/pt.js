@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.18.0': [
+      'Curso novo: o Midas responde sozinho às perguntas de boas-vindas do Duolingo (nível mais baixo, começar do zero) e segue direto para o grind.',
+    ],
     '0.17.3': [
       'A estimativa é medida sem parar no ritmo real da última 1 h 30, desce a cada segundo com o grind rodando e mostra o ritmo (passos por hora).',
     ],
