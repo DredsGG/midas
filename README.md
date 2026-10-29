@@ -24,6 +24,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
   - if the next lesson node doesn't show up on the page (it happens in background tabs), it opens the lesson by its direct address; if the page shows a different node as active (another tab moved the course on), it reloads once to get a fresh path;
   - a speaking exercise that can't be skipped makes it leave the lesson and reload; after 3 tries on the same node it moves on and comes back at the hourly restart;
   - a background watchdog reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs;
+  - if the grind stops without **Stop** being pressed, it starts again by itself: every 10 minutes Midas checks it, and if the grind tab was closed or the browser was restarted it opens Duolingo in a background tab (without taking focus); if the tab is still open but the grind stopped, it reloads it; if there's no progress for 15 minutes it treats the grind as stuck and reloads. Every restart goes to the log with date, time and reason. Switch: **Restart automatically if it stops** (on by default, in the HUD and the popup); after an update the grind comes back right away;
   - only one Duolingo tab grinds at a time, and when Duolingo asks for a streak goal it picks the highest one.
   - on a brand-new course it answers Duolingo's welcome questions by itself (lowest level, start from scratch) and goes straight into the first lesson.
   - the HUD shows how long is left: the estimate follows the real pace of the last 90 minutes (reloads and stuck speaking exercises included), counts down every second while the grind runs and shows the pace in steps per hour.
@@ -84,7 +85,7 @@ extension/
 ├── src/hud.js         MAIN world: in-page HUD (closed shadow DOM)
 ├── src/bridge.js      ISOLATED world: chrome.storage ⇄ page via CustomEvent
 ├── src/i18n.js        PT / EN / ES strings
-├── src/background.js  toolbar badge, update checks, reloads itself when new files land, frozen-tab watchdog
+├── src/background.js  toolbar badge, update checks, reloads itself when new files land, frozen-tab watchdog, auto-restart if the grind stops
 ├── COMO-INSTALAR.html install / update guide (PT / EN / ES), guia/guia.js
 └── popup/             toolbar popup
 ```
