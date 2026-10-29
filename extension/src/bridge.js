@@ -1,6 +1,6 @@
 // Midas — ponte (mundo ISOLATED): chrome.* ⇄ script da página via CustomEvent.
 (() => {
-  const DEFAULTS = { delay: 0, humanize: false, preset: 'rage', debug: false };
+  const DEFAULTS = { delay: 0, humanize: false, preset: 'rage', debug: false, autoRestart: true };
   // v0.15.0 (Firefox): objeto criado aqui (mundo isolado) chega à página sem acesso às propriedades.
   // cloneInto (só existe no Firefox) copia o detail para a página; no Chromium o objeto passa direto.
   const toPage = (o) => (typeof cloneInto === 'function' ? cloneInto(o, document.defaultView) : o);
@@ -74,6 +74,10 @@
     return !!alp_lock && alp_lock.id !== tabId && Date.now() - alp_lock.at < LOCK_TTL;
   };
   let beat = null, beatStart = 0;
+  const resetStep = safe(async () => {
+    const { alp_step = {} } = await chrome.storage.local.get('alp_step');
+    await chrome.storage.local.set({ alp_step: { ...alp_step, at: Date.now(), waitUntil: 0 } });
+  });
   const holdLock = safe(async () => {
     await chrome.storage.local.set({ alp_lock: { id: tabId, at: Date.now() } });
     // v0.13.6: sinal de vida para a sentinela do service worker (recarrega a aba se ela congelar)
@@ -104,7 +108,9 @@
     // a sentinela recarregou esta aba porque ela congelou: registra no log
     if (alp_watch?.at && Date.now() - alp_watch.at < 180000) {
       await chrome.storage.local.remove('alp_watch');
-      setTimeout(() => send('note', alp_watch.reason === 'frozen' ? 'frozen' : 'watchdog'), 2000);
+      // v0.19.0: reinício pela vigia (aba fechada, navegador reiniciado, parou sozinho, travado)
+      if (['closed', 'startup', 'stopped', 'stuck'].includes(alp_watch.reason)) setTimeout(() => send('restarted', { cause: alp_watch.reason, at: alp_watch.at }), 2000);
+      else setTimeout(() => send('note', alp_watch.reason === 'frozen' ? 'frozen' : 'watchdog'), 2000);
     }
     if (alp_grind?.active) {
       setTimeout(safe(async () => {
@@ -117,8 +123,8 @@
 
   // manda progresso/log salvos para a HUD (ela abre com os dados da última sessão)
   const hydrate = safe(async () => {
-    const { alp_progress, alp_log, alp_unknown, alp_seen } = await chrome.storage.local.get(['alp_progress', 'alp_log', 'alp_unknown', 'alp_seen']);
-    send('hydrate', { version: chrome.runtime.getManifest().version, progress: alp_progress || null, log: alp_log || [], unknown: alp_unknown || {}, seen: alp_seen || null });
+    const { alp_progress, alp_log, alp_unknown, alp_seen, alp_restarts } = await chrome.storage.local.get(['alp_progress', 'alp_log', 'alp_unknown', 'alp_seen', 'alp_restarts']);
+    send('hydrate', { version: chrome.runtime.getManifest().version, progress: alp_progress || null, log: alp_log || [], unknown: alp_unknown || {}, seen: alp_seen || null, restarts: alp_restarts || [] });
   });
 
   // log circular + progresso → storage (o popup lê daqui)
@@ -193,9 +199,22 @@
         logBuf.push(data);
         if (!flushT) flushT = setTimeout(flush, 700);
         break;
-      case 'progress':
+      case 'progress': {
         await chrome.storage.local.set({ alp_progress: { ...data, at: Date.now() } });
+        // v0.19.0: avanço de verdade (passos restantes ou pulados mudaram) → relógio da vigia de "travado"
+        if (beat && data) {
+          const sig = `${data.steps}|${Object.keys(data.skip || {}).length}`;
+          const { alp_step = {} } = await chrome.storage.local.get('alp_step');
+          if (alp_step.sig !== sig) await chrome.storage.local.set({ alp_step: { ...alp_step, sig, at: Date.now() } });
+        }
         break;
+      }
+      case 'waiting': {
+        // v0.19.0: espera "travado: recarregando a página em N s" — a vigia não conta como travado
+        const { alp_step = {} } = await chrome.storage.local.get('alp_step');
+        await chrome.storage.local.set({ alp_step: { ...alp_step, waitUntil: Number(data?.until) || 0 } });
+        break;
+      }
       case 'grindStep': {
         const { alp_grind = {} } = await chrome.storage.local.get('alp_grind');
         await chrome.storage.local.set({ alp_grind: { ...alp_grind, skip: data.skip } });
@@ -212,7 +231,12 @@
         let active = alp_grind.active;
         // v0.17.0: começou a rodar (Iniciar, atalho, popup) com versão urgente pendente → pausa na hora
         if (urgent && data.running) { send('pause'); }
-        if (data.running === 'grind') startBeat(); else if (data.running === null && data.was === 'grind') await stopBeat();
+        if (data.running === 'grind') {
+          // v0.19.0: o grind (re)começou nesta aba: o relógio de "sem avanço" conta a partir de agora
+          // (sem await: não pode atrasar o resto deste handler, que corre junto com a pausa da versão urgente)
+          if (!beat) resetStep();
+          startBeat();
+        } else if (data.running === null && data.was === 'grind') await stopBeat();
         if (data.running === 'grind') active = true;
         // v0.12.7: só o Parar desliga; o grind terminar sozinho não (completo já zera em grindDone)
         else if (data.running === null && data.was === 'grind' && data.manual !== false) active = false;

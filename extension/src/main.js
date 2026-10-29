@@ -1272,6 +1272,21 @@
     return BLOCK_WAIT_S[Math.min(n, BLOCK_WAIT_S.length - 1)];
   };
 
+  // espera "travado" e recarrega a página (o grind retoma com a lista de pulos zerada). Usada quando o
+  // laço devolve 'blocked' e quando a vigia acha o grind sem avanço (v0.19.0).
+  const reloadBlocked = async (token) => {
+    const secs = blockedWait();
+    report(T('log.blockedReload', { s: secs }), 'warn');
+    emit('waiting', { until: Date.now() + secs * 1000 });
+    for (let i = 0; i < secs && !token.stop; i++) await sleep(1000);
+    if (!token.stop && current === token) { emit('reloading', { fresh: true }); return true; }
+    return false;
+  };
+  const fmtWhen = (at) => {
+    const loc = window[Symbol.for('alp.i18n')]?.locale;
+    try { return new Date(at || Date.now()).toLocaleString(loc, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return new Date(at || Date.now()).toISOString(); }
+  };
+
   const grind = async (token, opts = {}) => {
     // início manual = lista de pulos zerada (dá nova chance a nós que falharam antes);
     // retomada automática após reload = mantém a lista salva
@@ -1448,15 +1463,21 @@
       emit('state', { running: 'grind' });
       const r = await grind(token, opts || {});
       report(T('log.grindResult', { r }));
-      if (r === 'blocked' && !token.stop && current === token) {
-        // continua "rodando": espera, recarrega a página e retoma com a lista de pulos zerada
-        const secs = blockedWait();
-        report(T('log.blockedReload', { s: secs }), 'warn');
-        for (let i = 0; i < secs && !token.stop; i++) await sleep(1000);
-        if (!token.stop && current === token) { emit('reloading', { fresh: true }); return; }
-      }
+      if (r === 'blocked' && !token.stop && current === token && await reloadBlocked(token)) return;
       if (current === token) stopAll(false);
     },
+    // v0.19.0: a vigia do service worker viu o grind sem avanço há 15 min (laço emperrado, lock ainda
+    // renovado): larga o laço preso e entra na mesma espera "travado" (blockedWait) com recarga.
+    // Não passa pelo stopAll: o lock continua com esta aba durante a espera.
+    stuck: async (d) => {
+      if (current?.kind !== 'grind') return;
+      report(T('log.restarted', { cause: T('cause.stuck', { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn');
+      current.stop = true;
+      const token = (current = { stop: false, kind: 'grind' });
+      if (!(await reloadBlocked(token)) && current === token) stopAll(false);
+    },
+    // v0.19.0: a página foi aberta/recarregada pela vigia: registra quando e por quê
+    restarted: (d) => report(T('log.restarted', { cause: T('cause.' + (d?.cause || 'closed'), { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn'),
     stop: () => { stopAll(); report(T('log.stopped')); },
     // outra aba assumiu o grind: para aqui sem desligar o grind salvo
     yield: () => { if (current?.kind === 'grind') { stopAll(false); report(T('log.otherTab'), 'warn'); } },

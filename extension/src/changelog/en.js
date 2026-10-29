@@ -3,6 +3,11 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.0': [
+      'If the grind tab closes, the browser restarts or the grind gets stuck, Midas starts it again by itself within 10 min, in a background tab.',
+      'Every restart is written to the log with date, time and reason.',
+      'New "Restart automatically if it stops" switch (on by default) in the panel and the popup. To stop for good, press Stop.',
+    ],
     '0.18.1': [
       'Pressing Start twice in a row (or in both the popup and the panel) no longer stops the grind right after it starts.',
     ],

@@ -4,6 +4,11 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.0': [
+      'Se a aba do grind fechar, o navegador reiniciar ou o grind travar, o Midas volta a rodar sozinho em até 10 min, numa aba em segundo plano.',
+      'Cada reinício fica no log com data, hora e motivo.',
+      'Nova chave "Reiniciar sozinho se parar" (ligada de fábrica) no painel e no popup. Para parar de vez, use Parar.',
+    ],
     '0.18.1': [
       'Apertar Iniciar duas vezes seguidas (ou no popup e na janela) não para mais o grind logo depois de começar.',
     ],

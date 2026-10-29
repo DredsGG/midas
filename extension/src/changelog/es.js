@@ -3,6 +3,11 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.0': [
+      'Si la pestaña del grind se cierra, el navegador se reinicia o el grind se atasca, Midas lo vuelve a iniciar solo en hasta 10 min, en una pestaña en segundo plano.',
+      'Cada reinicio queda en el registro con fecha, hora y motivo.',
+      'Nuevo interruptor "Reiniciar solo si se detiene" (activado de fábrica) en el panel y en el popup. Para detenerlo del todo, usa Detener.',
+    ],
     '0.18.1': [
       'Pulsar Iniciar dos veces seguidas (o en el popup y en el panel) ya no detiene el grind justo después de empezar.',
     ],

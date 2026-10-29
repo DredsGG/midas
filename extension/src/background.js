@@ -193,13 +193,105 @@ const onBeat = async (tabId) => {
   await chrome.storage.local.set({ alp_beat: { tabId, at: Date.now(), kicks: 0 } });
 };
 
+// v0.19.0 — vigia do grind dentro do Midas (pedido do André em 2026-10-29; antes era uma tarefa
+// agendada 5x/dia). Com o grind ligado (só o Parar desliga) e a chave "Reiniciar sozinho se parar"
+// ligada, a cada 10 min e 1,5 min depois de abrir o navegador:
+// - nenhuma aba com o lock fresco e a aba do grind sumiu → abre /learn em segundo plano (aba fechada,
+//   ou navegador reiniciado sem reabrir as abas); a página nova retoma pelo maybeResume da ponte;
+// - a aba do grind existe mas soltou o lock sem o Parar → recarrega a aba (parou sozinho);
+// - lock fresco, mas sem avanço há 15 min fora de uma espera de recarga → manda a aba para a mesma
+//   espera "travado: recarregando a página em N s" do grind (blockedWait), sem lógica nova;
+// - lock velho com a aba existindo = página morta: é com o watchGrind acima (não duplica).
+// Antes de agir sem lock, confirma 2 min depois (PC acordando, recarga de 1 h, abas restaurando).
+// Cada reinício entra no log da aba (data, hora, causa) e em alp_restarts (os últimos 50).
+const LIFE_EVERY_MIN = 10;
+const LOCK_FRESH_MS = 60e3;
+const STUCK_MS = 15 * 60e3;
+const LEARN = 'https://www.duolingo.com/learn';
+const isDuo = (t) => !!t && /^https:\/\/www\.duolingo\.com\//.test(t.url || t.pendingUrl || '');
+const tabOrNull = async (id) => { if (id == null) return null; try { return await chrome.tabs.get(id); } catch { return null; } };
+const noteRestart = async (cause, extra = {}) => {
+  const at = Date.now();
+  const { alp_restarts = [] } = await chrome.storage.local.get('alp_restarts');
+  await chrome.storage.local.set({
+    alp_restarts: alp_restarts.concat({ at, cause, ver: current(), ...extra }).slice(-50),
+    alp_watch: { at, reason: cause },
+  });
+};
+const openLearn = async () => {
+  // reaproveita a aba que a própria vigia abriu antes, se ela ainda existir
+  const { alp_life = {} } = await chrome.storage.local.get('alp_life');
+  const mine = await tabOrNull(alp_life.tabId);
+  if (isDuo(mine)) { await chrome.tabs.reload(mine.id).catch(() => {}); return mine.id; }
+  let t = null;
+  try { t = await chrome.tabs.create({ url: LEARN, active: false }); } catch {
+    // sem janela aberta (ex.: macOS com o Chrome sem janelas): abre uma janela sem foco
+    try { t = (await chrome.windows.create({ url: LEARN, focused: false })).tabs?.[0] || null; } catch { /* sem jeito */ }
+  }
+  if (t?.id != null) await chrome.storage.local.set({ alp_life: { ...alp_life, tabId: t.id } });
+  return t?.id ?? null;
+};
+const lifeOn = async () => {
+  const { alp_grind, alp_cfg, alp_update } = await chrome.storage.local.get(['alp_grind', 'alp_cfg', 'alp_update']);
+  if (!alp_grind?.active || alp_cfg?.autoRestart === false) return false;
+  if (alp_update?.available && alp_update?.urgent) return false; // versão urgente: a pausa é de propósito
+  return true;
+};
+const watchLife = async (trigger = 'tick') => {
+  if (!(await lifeOn())) return;
+  const { alp_lock, alp_beat, alp_step, alp_restarts = [] } = await chrome.storage.local.get(['alp_lock', 'alp_beat', 'alp_step', 'alp_restarts']);
+  const now = Date.now();
+  if (alp_lock && now - alp_lock.at < LOCK_FRESH_MS) {
+    // rodando: confere se está avançando
+    const tab = await tabOrNull(alp_beat?.tabId);
+    if (!tab || !alp_step?.at) return;
+    if (now < (alp_step.waitUntil || 0) + 60e3) return; // dentro da espera "travado: recarregando em N s"
+    if (now - alp_step.at < STUCK_MS) return;
+    if (alp_step.kickAt && now - alp_step.kickAt < STUCK_MS) return; // espera o último empurrão surtir efeito
+    await chrome.storage.local.set({ alp_step: { ...alp_step, kickAt: now } });
+    const mins = Math.round((now - alp_step.at) / 60e3);
+    await noteRestart('stuck', { mins });
+    await chrome.storage.local.remove('alp_watch'); // o aviso vai direto para a aba (não é página nova)
+    try { await chrome.tabs.sendMessage(tab.id, { cmd: 'stuck', data: { at: now, mins } }); }
+    catch { await chrome.storage.local.set({ alp_watch: { at: now, reason: 'stuck' } }); await chrome.tabs.reload(tab.id).catch(() => {}); }
+    return;
+  }
+  const beatTab = await tabOrNull(alp_beat?.tabId);
+  // lock velho com a aba ainda aberta: página morta/congelada → watchGrind (recarrega e, se precisar, troca a aba)
+  if (isDuo(beatTab) && alp_lock) return;
+  if (trigger === 'tick') { chrome.alarms.create('alp-life-confirm', { delayInMinutes: 2 }); return; }
+  if (isDuo(beatTab)) {
+    await noteRestart('stopped');
+    await chrome.tabs.reload(beatTab.id).catch(() => {});
+    return;
+  }
+  // a aba do grind sumiu (fechada, ou o navegador abriu de novo sem ela)
+  const recentBoot = alp_restarts.some((r) => r.cause === 'startup' && now - r.at < 5 * 60e3);
+  const cause = trigger === 'boot' || recentBoot ? 'startup' : 'closed';
+  if (!(cause === 'startup' && recentBoot)) await noteRestart(cause);
+  else await chrome.storage.local.set({ alp_watch: { at: now, reason: cause } });
+  await openLearn();
+};
+// navegador aberto de novo com o grind ligado: as abas restauradas retomam sozinhas (e registram
+// "navegador reiniciado"); se nenhuma assumir em 1,5 min, a vigia abre o /learn.
+const onBoot = async () => {
+  if (!(await lifeOn())) return;
+  await chrome.storage.local.remove(['alp_beat', 'alp_lock']); // ids de aba e lock da sessão anterior não valem mais
+  await noteRestart('startup');
+  chrome.alarms.create('alp-life-boot', { delayInMinutes: 1.5 });
+};
+
 const schedule = () => {
   chrome.alarms.create('alp-update', { delayInMinutes: 1, periodInMinutes: CHECK_EVERY_MIN });
   chrome.alarms.create('alp-disk', { delayInMinutes: DISK_EVERY_MIN, periodInMinutes: DISK_EVERY_MIN });
+  chrome.alarms.create('alp-life', { delayInMinutes: LIFE_EVERY_MIN, periodInMinutes: LIFE_EVERY_MIN });
 };
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === 'alp-update') checkUpdate();
   if (a.name === 'alp-disk') { watchDisk(); watchGrind(); }
+  if (a.name === 'alp-life') watchLife('tick');
+  if (a.name === 'alp-life-confirm') watchLife('confirm');
+  if (a.name === 'alp-life-boot') watchLife('boot');
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
@@ -212,7 +304,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
 chrome.storage.onChanged.addListener((changes) => { if (changes.alp_running) paint(); });
 // v0.17.0: abrir o navegador de novo desfaz o "adiar" do X (o aviso volta na próxima abertura)
-chrome.runtime.onStartup.addListener(async () => { paint(); schedule(); await saveUpdate({ snooze: null }); checkUpdate(); });
+chrome.runtime.onStartup.addListener(async () => { paint(); schedule(); onBoot(); await saveUpdate({ snooze: null }); checkUpdate(); });
 chrome.runtime.onInstalled.addListener(async (d) => {
   paint();
   schedule();

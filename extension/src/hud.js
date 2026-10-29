@@ -392,6 +392,7 @@
           <p class="hint" data-s="hint"></p>
           <label class="set"><span class="ttl">${tx('set.delay')}${info('help.delay')}</span><input type="range" min="0" max="5000" step="50" data-c="delay"><span class="num" data-s="delay"></span></label>
           <label class="set"><span class="ttl">${tx('set.humanize')}${info('help.humanize')}</span><span class="switch"><input type="checkbox" data-c="humanize"><span></span></span></label>
+          <label class="set"><span class="ttl">${tx('set.autoRestart')}${info('help.autoRestart')}</span><span class="switch"><input type="checkbox" data-c="autoRestart"><span></span></span></label>
         </div>
         <details class="card" data-a="log"><summary><h3 class="ttl">${tx('log.title')}${info('help.log')}</h3><button class="copy" data-a="copy" title="${esc(T('log.copyTitle'))}" data-i18n-title="log.copyTitle">${tx('log.copy')}</button></summary><pre></pre><div class="unk"></div></details>
       </div>
@@ -647,6 +648,13 @@
     delay.addEventListener('input', () => { $('[data-s="delay"]').textContent = `${delay.value} ms`; });
     delay.addEventListener('change', () => pushCfg('manual'));
     human.addEventListener('change', () => pushCfg('manual'));
+    // v0.19.0: "Reiniciar sozinho se parar" — independente do preset de velocidade
+    const autoR = $('[data-c="autoRestart"]');
+    autoR.addEventListener('change', () => {
+      const d = { autoRestart: autoR.checked };
+      API()?.commands?.config?.(d);
+      document.dispatchEvent(new CustomEvent('alp:out', { detail: { type: 'saveConfig', data: d } }));
+    });
     for (const b of [...panel.querySelectorAll('.seg button')]) {
       b.addEventListener('click', () => {
         const p = PRESETS[b.dataset.p];
@@ -735,7 +743,7 @@
     const cfg = API()?.cfg;
     if (cfg) {
       const d = $('[data-c="delay"]'), h = $('[data-c="humanize"]');
-      if (document.activeElement !== host) { d.value = cfg.delay; h.checked = !!cfg.humanize; }
+      if (document.activeElement !== host) { d.value = cfg.delay; h.checked = !!cfg.humanize; $('[data-c="autoRestart"]').checked = cfg.autoRestart !== false; }
       $('[data-s="delay"]').textContent = `${d.value} ms`;
       const pr = presetOf(cfg);
       for (const b of $('.panel').querySelectorAll('.seg button')) b.classList.toggle('on', b.dataset.p === pr);

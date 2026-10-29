@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const I18N = window[Symbol.for('alp.i18n')] || { t: (k) => k, locale: 'pt-BR', lang: 'pt' };
 const T = I18N.t;
-const DEFAULTS = { delay: 0, humanize: false, preset: 'rage', debug: false };
+const DEFAULTS = { delay: 0, humanize: false, preset: 'rage', debug: false, autoRestart: true };
 const PRESETS = {
   rage: { delay: 0, humanize: false },
   legit: { delay: 2500, humanize: true },
@@ -181,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('delay').value = cfg.delay;
   $('delay-out').textContent = cfg.delay;
   $('humanize').checked = cfg.humanize;
+  $('autoRestart').checked = cfg.autoRestart !== false;
 
   const showPreset = () => {
     const p = presetOf(cfg);
@@ -197,6 +198,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('delay').addEventListener('input', () => ($('delay-out').textContent = $('delay').value));
   $('delay').addEventListener('change', () => saveCfg('manual'));
   $('humanize').addEventListener('change', () => saveCfg('manual'));
+  // v0.19.0: "Reiniciar sozinho se parar" (não mexe no preset)
+  $('autoRestart').addEventListener('change', async () => {
+    const { alp_cfg: now = {} } = await chrome.storage.local.get('alp_cfg');
+    cfg.autoRestart = $('autoRestart').checked;
+    await chrome.storage.local.set({ alp_cfg: { ...now, autoRestart: cfg.autoRestart } });
+    send('config');
+  });
   document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
     const p = PRESETS[b.dataset.p];
     if (p.delay != null) { $('delay').value = p.delay; $('delay-out').textContent = p.delay; $('humanize').checked = p.humanize; }
