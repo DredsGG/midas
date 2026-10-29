@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.18.1': [
+      'Pressing Start twice in a row (or in both the popup and the panel) no longer stops the grind right after it starts.',
+    ],
     '0.18.0': [
       'New course: Midas answers Duolingo\'s welcome questions by itself (lowest level, start from scratch) and goes straight on with the grind.',
     ],

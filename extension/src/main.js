@@ -1440,7 +1440,9 @@
       if (current === token) stopAll(false);
     },
     grind: async (opts) => {
-      if (current?.kind === 'grind') { stopAll(); report(T('log.grindStopped')); return; } // alterna
+      // v0.18.1: "Iniciar" com o grind já rodando não faz nada. Antes alternava: um 2º Iniciar (clique
+      // duplo, ou popup + HUD) desligava o grind logo depois de começar. Só o atalho Alt+G alterna.
+      if (current?.kind === 'grind') return;
       stopAll();
       const token = (current = { stop: false, kind: 'grind' });
       emit('state', { running: 'grind' });
@@ -1482,7 +1484,7 @@
     else if (e.altKey && k === 'enter') cmd = 'solve';
     else if (e.altKey && k === 's') cmd = 'skip';
     else if (e.altKey && k === 'l') cmd = 'lesson';
-    else if (e.altKey && k === 'g') cmd = 'grind';
+    else if (e.altKey && k === 'g') cmd = current?.kind === 'grind' ? 'stop' : 'grind'; // atalho alterna
     else if (e.altKey && k === 'x') cmd = 'stop';
     if (!cmd) return;
     e.preventDefault();

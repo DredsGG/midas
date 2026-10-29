@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.18.1': [
+      'Pulsar Iniciar dos veces seguidas (o en el popup y en el panel) ya no detiene el grind justo después de empezar.',
+    ],
     '0.18.0': [
       'Curso nuevo: Midas responde solo las preguntas de bienvenida de Duolingo (nivel más bajo, empezar desde cero) y sigue directo con el grind.',
     ],

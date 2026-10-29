@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.18.1': [
+      'Apertar Iniciar duas vezes seguidas (ou no popup e na janela) não para mais o grind logo depois de começar.',
+    ],
     '0.18.0': [
       'Curso novo: o Midas responde sozinho às perguntas de boas-vindas do Duolingo (nível mais baixo, começar do zero) e segue direto para o grind.',
     ],
