@@ -9,3 +9,7 @@ licensed under the Apache License, Version 2.0:
 
 Changes: new lesson and story solvers, Auto Grind for Legendary across the
 whole path, in-page HUD, speed presets, i18n (PT/EN/ES) and themes.
+
+Third-party code bundled in extension/src/vendor/qrcode.js:
+  - qrcode-generator 2.0.4 by Kazuhiko Arase (https://github.com/kazuhikoarase/qrcode-generator),
+    MIT License. Wrapped in a function so it doesn't create a global; otherwise unchanged.

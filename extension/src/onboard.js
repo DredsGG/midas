@@ -125,7 +125,9 @@
     const el = document.createElement('div');
     el.className = 'ob-back' + (opts.fixed ? ' fixed' : '') + (opts.page ? ' page' : '') + (opts.locked ? ' locked' : '');
     // só o Esc de verdade (do teclado) fecha; o Midas não manda teclas, mas por garantia
-    const key = (e) => { if (e.key === 'Escape' && e.isTrusted !== false && !cur?.opts?.locked) { e.preventDefault(); e.stopPropagation(); close(); } };
+    // v0.19.5: com o quadro "Apoiar ♥" aberto por cima, o Esc fecha só ele (antes fechava os dois)
+    const key = (e) => { if (e.key === 'Escape' && globalThis[Symbol.for('alp.support')]?.isOpen) return;
+      if (e.key === 'Escape' && e.isTrusted !== false && !cur?.opts?.locked) { e.preventDefault(); e.stopPropagation(); close(); } };
     el.addEventListener('click', (e) => {
       const a = e.target.closest?.('[data-ob]')?.getAttribute('data-ob');
       if (e.target === el) return; // clique fora do quadro não fecha (só X, Esc, Pular ou Entendi)

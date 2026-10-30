@@ -3,6 +3,12 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.5': [
+      'Nuevo botón Apoyar ♥ en el pie, opcional: Pix (Brasil) o GitHub Sponsors (otros países). No cambia nada en Midas.',
+    ],
+    '0.19.2': [
+      'Los ejercicios de completar escribiendo (p. ej. "Completa la traducción") ya no se atascan cuando otra extensión de Duolingo está abierta al mismo tiempo.',
+    ],
     '0.19.1': [
       'Después de una actualización, el grind vuelve al instante. Antes, la pestaña podía quedarse quieta hasta 4 min creyendo que otra pestaña seguía corriendo.',
     ],

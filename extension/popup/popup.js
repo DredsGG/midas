@@ -253,6 +253,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     while (url.length > 7500 && log.length > 5) { log = log.slice(Math.ceil(log.length / 5)); url = make(log, true); }
     return url;
   };
+  // v0.19.5 (regra 16): "Apoiar ♥" — quadro opcional; a escolha (Brasil/outro país) fica só para abrir no mesmo lugar
+  const SUP = globalThis[Symbol.for('alp.support')];
+  $('sup-open').addEventListener('click', (e) => {
+    let last = null;
+    try { last = localStorage.getItem('alp.support'); } catch { /* ok */ }
+    SUP?.open({ mountIn: document.body, styleRoot: document, fixed: true, T, lang: I18N.lang, locale: I18N.locale, project: 'Midas', last,
+      onChoice: (c) => { try { c ? localStorage.setItem('alp.support', c) : localStorage.removeItem('alp.support'); } catch { /* ok */ } },
+      openUrl: (u) => chrome.tabs.create({ url: u }), returnFocus: e.currentTarget });
+  });
   $('bug-open').addEventListener('click', async () => {
     $('bug').hidden = !$('bug').hidden;
     if (!$('bug').hidden) { $('bug-diag').textContent = (await bugReport('')).diag; $('bug-what').focus(); scrollTo(0, 0); }
@@ -309,7 +318,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     OB.open({ kind, mountIn: document.body, styleRoot: document, fixed: true, T, version: VER, items, onClose: save });
   };
   $('howto').addEventListener('click', () => showOb('tutorial'));
-  I18N.onChange?.(() => { if (OB?.isOpen) OB.refresh(); });
+  I18N.onChange?.(() => { if (OB?.isOpen) OB.refresh(); if (SUP?.isOpen) SUP.refresh({ lang: I18N.lang, locale: I18N.locale }); });
   {
     const { alp_seen } = await chrome.storage.local.get('alp_seen');
     const k = OB?.decide(alp_seen, VER);

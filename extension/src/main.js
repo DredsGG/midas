@@ -351,7 +351,10 @@
   const tableCells = (ch) => (ch.displayTableTokens || []).flatMap((row) => row.map((cell) => cell?.[0]));
 
   const fillInputs = (answers) => {
-    const inputs = $$(`input[type="text"], ${S.textInput}, textarea`).filter((i) => !i.disabled);
+    // v0.19.2: só os campos do exercício. Outra extensão (painel "DLP_") põe ~30 inputs na página e
+    // a contagem nunca batia → completeReverseTranslation travava a lição.
+    const root = $('[data-test^="challenge challenge-"]') || document;
+    const inputs = $$(`input[type="text"], ${S.textInput}, textarea`, root).filter((i) => !i.disabled);
     if (inputs.length && inputs.length === answers.length) {
       inputs.forEach((inp, i) => typeInto(inp, answers[i]));
       return true;

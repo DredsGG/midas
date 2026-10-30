@@ -4,6 +4,12 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.5': [
+      'Novo botão Apoiar ♥ no rodapé, opcional: Pix (Brasil) ou GitHub Sponsors (outros países). Não muda nada no Midas.',
+    ],
+    '0.19.2': [
+      'Exercícios de completar a frase digitando (ex.: "Complete a tradução") não travam mais a lição quando outra extensão do Duolingo está aberta junto.',
+    ],
     '0.19.1': [
       'Depois de uma atualização, o grind volta na hora. Antes, a aba podia ficar até 4 min parada achando que outra aba ainda estava rodando.',
     ],

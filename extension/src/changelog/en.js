@@ -3,6 +3,12 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.5': [
+      'New optional Support ♥ button in the footer: Pix (Brazil) or GitHub Sponsors (other countries). It changes nothing in Midas.',
+    ],
+    '0.19.2': [
+      'Type-to-complete exercises (e.g. "Complete the translation") no longer get stuck when another Duolingo extension is running alongside.',
+    ],
     '0.19.1': [
       'After an update, the grind comes back right away. Before, the tab could sit idle for up to 4 min, thinking another tab was still running.',
     ],

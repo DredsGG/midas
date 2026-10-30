@@ -190,3 +190,7 @@ html[data-theme="light"] .updbtn.bugbtn, html[data-theme="light"] .bug summary {
 .perm { border-color: #ff4b4b; }
 .perm b { color: #ff4b4b; }
 .perm p { margin: 6px 0 8px; }
+
+/* v0.19.5: "Apoiar ♥" (regra 16) */
+.updbtn.supbtn { color: #ff4b6e; }
+.updbtn.supbtn svg { fill: #ff4b6e; }

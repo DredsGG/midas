@@ -23,6 +23,7 @@
     seen: null, seenLoaded: false, // v0.15.0: alp_seen (tutorial e novidades já vistos)
   };
   const OB = () => window[Symbol.for('alp.onboard')];
+  const SUP = () => window[Symbol.for('alp.support')]; // v0.19.5: quadro "Apoiar ♥" (regra 16)
   let maybeOnboard = () => {}; // definida no build() (precisa do shadow DOM)
 
   const fmtDur = (ms) => {
@@ -327,6 +328,8 @@
   .bug .btn.blue { background: var(--macaw); color: #04304a; box-shadow: 0 4px 0 #1899d6; }
   .bug .btn.blue:active { box-shadow: 0 1px 0 #1899d6; }
   .updbtn.bugbtn { color: var(--macaw); }
+  .updbtn.supbtn { color: #ff4b6e; }
+  .updbtn.supbtn svg { fill: #ff4b6e; }
   .keys kbd { font: 700 10px duolingo-sans, sans-serif; border: 2px solid var(--swan); border-bottom-width: 3px; border-radius: 6px; padding: 0 4px; color: var(--wolf); }
   `;
 
@@ -397,7 +400,7 @@
         <details class="card" data-a="log"><summary><h3 class="ttl">${tx('log.title')}${info('help.log')}</h3><button class="copy" data-a="copy" title="${esc(T('log.copyTitle'))}" data-i18n-title="log.copyTitle">${tx('log.copy')}</button></summary><pre></pre><div class="unk"></div></details>
       </div>
       <div class="keys"><span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> ${tx('key.solve')}</span><span><kbd>Alt</kbd>+<kbd>G</kbd> ${tx('key.grind')}</span><span><kbd>Alt</kbd>+<kbd>X</kbd> ${tx('key.stop')}</span><span><kbd>Alt</kbd>+<kbd>H</kbd> ${tx('key.hud')}</span></div>
-      <div class="updrow"><button class="updbtn" type="button" data-a="updCheck">${ICON_REFRESH}${tx('upd.check')}</button>${info('help.update')}<span class="upd-st"></span><button class="updbtn bugbtn" type="button" data-a="bugOpen">${ICON_BUG}${tx('bug.btn')}</button>${info('help.bug')}</div>
+      <div class="updrow"><button class="updbtn" type="button" data-a="updCheck">${ICON_REFRESH}${tx('upd.check')}</button>${info('help.update')}<span class="upd-st"></span><button class="updbtn bugbtn" type="button" data-a="bugOpen">${ICON_BUG}${tx('bug.btn')}</button>${info('help.bug')}<button class="updbtn supbtn" type="button" data-a="supOpen">${tx('sup.btn')} ♥</button>${info('help.support')}</div>
       <div class="credit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0l1.9 5.6L16 6.1l-4.9 3.6L12.9 16 8 12.4 3.1 16l1.8-6.3L0 6.1l6.1-.5z"/></svg><span class="by">${tx('credit.by')}</span><a class="gh" href="https://github.com/DredsGG" target="_blank" rel="noopener noreferrer" title="github.com/DredsGG"><b>Dreds</b></a><span class="ver" data-s="ver"></span></div>
     </section>
     <div class="tip" role="tooltip" hidden></div>
@@ -487,7 +490,7 @@
         }
       });
     }
-    I18N.onChange?.(() => { hideTip(); applyTexts(); if (OB()?.isOpen) OB().refresh(); maybeOnboard(); });
+    I18N.onChange?.(() => { hideTip(); applyTexts(); if (OB()?.isOpen) OB().refresh(); if (SUP()?.isOpen) SUP().refresh({ lang: I18N.lang, locale: I18N.locale }); maybeOnboard(); });
 
     // tamanho: redimensionável pelo canto, lembrado entre páginas
     const panel = $('.panel');
@@ -586,6 +589,12 @@
     // relatar bug: monta o relatório, abre o GitHub já preenchido ou copia
     const bugCard = $('.bug'), bugWhat = $('[data-s="bugWhat"]');
     const fillDiag = () => { $('[data-s="bugDiag"]').textContent = bugReport('').diag; };
+    // v0.19.5 (regra 16): "Apoiar ♥" abre o quadro no meio da tela; só abre quando a pessoa clica
+    $('[data-a="supOpen"]').addEventListener('click', (e) => {
+      const sp = SUP(); if (!sp) return;
+      sp.open({ mountIn: $('.wrap.layer'), styleRoot: shadow, T, lang: I18N.lang, locale: I18N.locale, project: 'Midas',
+        last: state.ui.support || null, onChoice: (c) => { state.ui.support = c; saveUi({ support: c }); }, returnFocus: e.currentTarget });
+    });
     $('[data-a="bugOpen"]').addEventListener('click', () => { bugCard.hidden = !bugCard.hidden; if (!bugCard.hidden) { fillDiag(); bugWhat.focus(); $('.panel').scrollTop = 0; } });
     $('[data-a="bugClose"]').addEventListener('click', () => { bugCard.hidden = true; });
     // as teclas digitadas no campo não podem virar atalho do Midas/Duolingo
