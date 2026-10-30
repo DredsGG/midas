@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.6': [
+      'Los ejercicios de escribir (como "Completa la traducción") ya no se atascan mientras el ejercicio anterior aún está saliendo de la pantalla.',
+    ],
     '0.19.5': [
       'Nuevo botón Apoyar ♥ en el pie, opcional: Pix (Brasil) o GitHub Sponsors (otros países). No cambia nada en Midas.',
     ],

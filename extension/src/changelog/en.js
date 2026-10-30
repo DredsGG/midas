@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.6': [
+      'Typing exercises (like "Complete the translation") no longer get stuck while the previous exercise is still leaving the screen.',
+    ],
     '0.19.5': [
       'New optional Support ♥ button in the footer: Pix (Brazil) or GitHub Sponsors (other countries). It changes nothing in Midas.',
     ],

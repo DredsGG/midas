@@ -350,11 +350,25 @@
       .map((t) => (t.damageStart !== undefined ? t.text.substring(t.damageStart) : t.text));
   const tableCells = (ch) => (ch.displayTableTokens || []).flatMap((row) => row.map((cell) => cell?.[0]));
 
+  // v0.19.6: o exercício da vez. Na troca de exercício o Duolingo deixa o anterior no DOM por um
+  // instante (animação de saída); pegar o primeiro "challenge" da página às vezes pegava o velho e os
+  // campos digitados não eram os da tela → "Verificar" não habilitava → "travado (…), pulando".
+  const challengeRoot = () => {
+    const all = $$('[data-test^="challenge challenge-"]');
+    const vis = all.filter(isVisible);
+    return vis[vis.length - 1] || all[all.length - 1] || null;
+  };
+  const answerFields = (root) => {
+    const all = $$(`input[type="text"], ${S.textInput}, ${S.translateInput}, textarea`, root || document).filter((i) => !i.disabled && !i.readOnly);
+    const vis = root ? all.filter(isVisible) : all;
+    return vis.length ? vis : all; // campo "invisível" ao checkVisibility mas ativo: usa assim mesmo
+  };
   const fillInputs = (answers) => {
     // v0.19.2: só os campos do exercício. Outra extensão (painel "DLP_") põe ~30 inputs na página e
     // a contagem nunca batia → completeReverseTranslation travava a lição.
-    const root = $('[data-test^="challenge challenge-"]') || document;
-    const inputs = $$(`input[type="text"], ${S.textInput}, textarea`, root).filter((i) => !i.disabled);
+    const root = challengeRoot() || document;
+    let inputs = answerFields(root === document ? null : root);
+    if (!inputs.length && root !== document) inputs = answerFields(null).filter((i) => !i.closest('[class*="DLP_"]'));
     if (inputs.length && inputs.length === answers.length) {
       inputs.forEach((inp, i) => typeInto(inp, answers[i]));
       return true;
@@ -386,6 +400,25 @@
     }
     b.click();
     return true;
+  };
+
+  // v0.19.6: diagnóstico curto de exercício de digitar que travou (sem texto da resposta)
+  const diagTyped = () => {
+    try {
+      const { ch } = getChallenge() || {};
+      const roots = $$('[data-test^="challenge challenge-"]');
+      const root = challengeRoot();
+      const toks = ch?.displayTokens || [];
+      const inRoot = root ? $$('input, textarea, [contenteditable="true"]', root) : [];
+      const pageIn = $$('input[type="text"], textarea').length;
+      return T('log.diagTyped', {
+        type: ch?.type || '?', roots: roots.length, vis: roots.filter(isVisible).length,
+        f: inRoot.length, fe: inRoot.filter((i) => !i.disabled).length, p: pageIn,
+        b: toks.filter((x) => x?.isBlank).length, d: toks.filter((x) => x?.damageStart !== undefined).length,
+        best: ch?.challengeResponseTrackingProperties?.best_solution ? 1 : 0,
+        tr: root && $(S.translateInput, root) ? 1 : 0, next: isEnabled($(S.next)) ? 1 : 0,
+      });
+    } catch (e) { return 'diag: ' + (e?.message || e); }
   };
 
   // ───────────────────────── solvers ─────────────────────────
@@ -493,7 +526,7 @@
     translate: translateLike,
     completeReverseTranslation: async ({ ch }) => {
       const best = ch.challengeResponseTrackingProperties?.best_solution;
-      const input = $(S.translateInput);
+      const input = $(S.translateInput, challengeRoot() || document);
       if (input && best) return typeInto(input, best);
       return fillInputs(blankAnswers(ch.displayTokens));
     },
@@ -817,6 +850,7 @@
               return 'stuck';
             }
             report(T('log.stuckSkip', { type: t }), 'warn');
+            if (tries === 1) report(diagTyped(), 'warn'); // v0.19.6: forma do exercício, para achar a causa
             emit('stuckType', { type: t });
             skipChallenge(tries);
             answeredAt = Date.now();
@@ -1424,6 +1458,7 @@
     cfg, getStatus, getChallenge, solveCurrent, pressNext, skipChallenge, runLesson, runStory, runSession,
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
+    fillInputs, challengeRoot, diagTyped, // v0.19.6 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────

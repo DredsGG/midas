@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.6': [
+      'Exercícios de digitar (como "Complete a tradução") não travam mais quando o exercício anterior ainda está saindo da tela.',
+    ],
     '0.19.5': [
       'Novo botão Apoiar ♥ no rodapé, opcional: Pix (Brasil) ou GitHub Sponsors (outros países). Não muda nada no Midas.',
     ],

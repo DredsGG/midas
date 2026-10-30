@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.19.5-f5b301)
+![Version](https://img.shields.io/badge/version-0.19.6-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/hud-auto-grind.png" width="420" alt="Midas HUD inside Duolingo: Auto Grind progress with legendary, left and estimate counters, current lesson buttons, speed presets and the live log">
@@ -28,7 +28,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
   - only one Duolingo tab grinds at a time, and when Duolingo asks for a streak goal it picks the highest one.
   - on a brand-new course it answers Duolingo's welcome questions by itself (lowest level, start from scratch) and goes straight into the first lesson.
   - the HUD shows how long is left: the estimate follows the real pace of the last 90 minutes (reloads and stuck speaking exercises included), counts down every second while the grind runs and shows the pace in steps per hour.
-- **Lesson solver.** 35+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added. Typed answers only look for fields inside the current challenge, so another Duolingo extension on the page doesn't get in the way.
+- **Lesson solver.** 35+ challenge types (translate, match, tap/cloze, listen, select, complete, order…), plus a generic fallback that logs any new type it meets so it can be added. Typed answers only go into the challenge that is on screen (not the one still animating out), so neither the previous exercise nor another Duolingo extension on the page gets in the way.
 - **Story solver.** Multiple choice, select phrase, arrange, gap fill, point-to-phrase and match.
 - **In-page HUD.** A gold crown in the corner of Duolingo opens a draggable, resizable panel (shadow DOM, Duolingo's own colors) with live progress, current lesson controls, settings and log.
 - **Speed presets.** *Rage* (0 ms, as fast as possible), *Legit* (about 2.5 s between actions with human-like variation) or *Manual* (pick your own delay and humanizing).
