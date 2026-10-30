@@ -85,6 +85,8 @@ extension/
 ├── src/hud.js         MAIN world: in-page HUD (closed shadow DOM)
 ├── src/bridge.js      ISOLATED world: chrome.storage ⇄ page via CustomEvent
 ├── src/i18n.js        PT / EN / ES strings
+├── src/support.js     "Support ♥" box: Pix BR Code + QR built offline, GitHub Sponsors link
+├── src/vendor/qrcode.js  qrcode-generator (MIT), local copy, kept off window
 ├── src/background.js  toolbar badge, update checks, reloads itself when new files land, frozen-tab watchdog, auto-restart if the grind stops
 ├── COMO-INSTALAR.html install / update guide (PT / EN / ES), guia/guia.js
 └── popup/             toolbar popup
@@ -106,7 +108,9 @@ Measured on a live account: a Legendary skill went 17/17 with no mistakes in abo
 
 ## Support
 
-Midas is free and stays free. If it saves you time, there's an optional **Support ♥** button in the footer of the HUD and the popup: **Pix** for Brazil (QR code and copy-and-paste code, R$ 5 / 10 / 25 or any amount) or **[GitHub Sponsors](https://github.com/sponsors/DredsGG)** for everyone else. It changes nothing in Midas, makes no network request and tracks nothing; the QR code is drawn locally.
+This project is free and always will be. If it helps you, you can support it on [GitHub Sponsors](https://github.com/sponsors/DredsGG) (one-time or monthly). 🇧🇷 In Brazil? Pix: `fa525dad-afca-4683-845d-eee7225a53e3`
+
+In Midas itself there's an optional **Support ♥** button in the footer of the HUD and the popup: **Pix** for Brazil (QR code and copy-and-paste code, R$ 5 / 10 / 25 or any amount) or **[GitHub Sponsors](https://github.com/sponsors/DredsGG)** for everyone else. It changes nothing in Midas, makes no network request and tracks nothing; the QR code is drawn locally.
 
 ## Credits
 
