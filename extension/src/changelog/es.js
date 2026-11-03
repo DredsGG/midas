@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.7': [
+      'Los ejercicios de completar la frase escribiendo que venían sin la palabra del hueco ahora se responden. Antes se saltaban, y en Legendario se abandonaba la lección entera.',
+    ],
     '0.19.6': [
       'Los ejercicios de escribir (como "Completa la traducción") ya no se atascan mientras el ejercicio anterior aún está saliendo de la pantalla.',
     ],

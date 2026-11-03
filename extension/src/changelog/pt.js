@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.7': [
+      'Exercícios de completar a frase digitando que vinham sem a palavra da lacuna agora são respondidos. Antes eram pulados, e nos Titãs a lição inteira era abandonada.',
+    ],
     '0.19.6': [
       'Exercícios de digitar (como "Complete a tradução") não travam mais quando o exercício anterior ainda está saindo da tela.',
     ],

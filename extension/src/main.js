@@ -349,6 +349,31 @@
       .filter((t) => t && (t.damageStart !== undefined || t.isBlank))
       .map((t) => (t.damageStart !== undefined ? t.text.substring(t.damageStart) : t.text));
   const tableCells = (ch) => (ch.displayTableTokens || []).flatMap((row) => row.map((cell) => cell?.[0]));
+  // v0.19.7: lacuna única tirada da frase-resposta (best_solution) menos o texto fixo antes e depois.
+  // Reserva para quando o token da lacuna vem sem texto: o campo ficava vazio, o "Verificar" não
+  // habilitava e o exercício era pulado (Titãs, sem "Pular": a lição inteira era abandonada).
+  const diffBlank = (tokens, best) => {
+    const toks = tokens || [];
+    const idx = toks.reduce((a, t, i) => (t?.isBlank ? a.concat(i) : a), []);
+    if (idx.length !== 1 || !best) return null;
+    const i = idx[0];
+    const pre = toks.slice(0, i).map((t) => t?.text ?? '').join('');
+    const suf = toks.slice(i + 1).map((t) => t?.text ?? '').join('');
+    const b = String(best);
+    const lb = b.toLowerCase();
+    if (b.length <= pre.length + suf.length || !lb.startsWith(pre.toLowerCase()) || !lb.endsWith(suf.toLowerCase())) return null;
+    let ans = b.slice(pre.length, b.length - suf.length);
+    const ds = toks[i]?.damageStart;
+    if (ds !== undefined && ans.length > ds) ans = ans.substring(ds);
+    return ans.trim() ? ans : null;
+  };
+  // respostas das lacunas; vazia/sem texto → tenta a frase-resposta
+  const typedAnswers = (ch) => {
+    const a = blankAnswers(ch.displayTokens);
+    if (a.length && a.every((x) => x != null && String(x).trim())) return a;
+    const d = diffBlank(ch.displayTokens, ch.challengeResponseTrackingProperties?.best_solution);
+    return d != null ? [d] : a;
+  };
 
   // v0.19.6: o exercício da vez. Na troca de exercício o Duolingo deixa o anterior no DOM por um
   // instante (animação de saída); pegar o primeiro "challenge" da página às vezes pegava o velho e os
@@ -383,6 +408,20 @@
     return ok;
   };
 
+  // v0.19.7: preenche e confere. Campo que ficou vazio depois de digitar = a resposta das lacunas não
+  // serviu → tenta a frase-resposta (diffBlank) antes de desistir.
+  const typedFieldsEmpty = () => {
+    const root = challengeRoot();
+    const f = root ? answerFields(root) : [];
+    return f.length > 0 && f.some((i) => !String(i.value ?? '').trim());
+  };
+  const fillTyped = (ch) => {
+    const ok = fillInputs(typedAnswers(ch));
+    if (ok && !typedFieldsEmpty()) return true;
+    const d = diffBlank(ch.displayTokens, ch.challengeResponseTrackingProperties?.best_solution);
+    return d != null ? fillInputs([d]) : ok;
+  };
+
   // v0.12.6: usa o "Pular"/"Não posso falar agora" VISÍVEL mais recente (pode haver cópia
   // velha no DOM durante a transição). Em tentativas ímpares chama o onClick do React direto.
   const skipButton = () => {
@@ -415,6 +454,8 @@
         type: ch?.type || '?', roots: roots.length, vis: roots.filter(isVisible).length,
         f: inRoot.length, fe: inRoot.filter((i) => !i.disabled).length, p: pageIn,
         b: toks.filter((x) => x?.isBlank).length, d: toks.filter((x) => x?.damageStart !== undefined).length,
+        bz: toks.filter((x) => x?.isBlank && !String(x.text ?? '').trim()).length,
+        v: inRoot.filter((i) => String(i.value ?? i.textContent ?? '').trim()).length,
         best: ch?.challengeResponseTrackingProperties?.best_solution ? 1 : 0,
         tr: root && $(S.translateInput, root) ? 1 : 0, next: isEnabled($(S.next)) ? 1 : 0,
       });
@@ -528,9 +569,9 @@
       const best = ch.challengeResponseTrackingProperties?.best_solution;
       const input = $(S.translateInput, challengeRoot() || document);
       if (input && best) return typeInto(input, best);
-      return fillInputs(blankAnswers(ch.displayTokens));
+      return fillTyped(ch);
     },
-    listenComplete: ({ ch }) => fillInputs(blankAnswers(ch.displayTokens)),
+    listenComplete: ({ ch }) => fillTyped(ch),
     partialReverseTranslate: ({ ch }) => {
       const text = (ch.displayTokens || []).filter((t) => t.isBlank).map((t) => t.text).join('');
       const el = $(S.editable);
@@ -1458,7 +1499,7 @@
     cfg, getStatus, getChallenge, solveCurrent, pressNext, skipChallenge, runLesson, runStory, runSession,
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
-    fillInputs, challengeRoot, diagTyped, // v0.19.6 (testes)
+    fillInputs, challengeRoot, diagTyped, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────
