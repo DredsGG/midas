@@ -1504,9 +1504,14 @@
 
   // ───────────────────────── comandos ─────────────────────────
   let current = null; // { stop:boolean, kind }
+  // v0.19.8: grind ligado nesta página (continua true nas esperas e recargas; só o "Parar" ou outra aba
+  // assumindo desligam). Com ele, unload.js corta o "Atualizar o site?" do Duolingo na recarga.
+  let keepOn = false;
+  window[Symbol.for('alp.noUnloadPrompt')] = () => keepOn || current?.kind === 'grind';
   // manual = o usuário mandou parar (só isso desliga o grind de vez); fim por conta
   // própria (lição avulsa, grind completo) manda manual=false
   const stopAll = (manual = true) => {
+    if (manual) keepOn = false;
     const was = current?.kind || null;
     if (current) current.stop = true;
     current = null;
@@ -1539,9 +1544,11 @@
       if (current?.kind === 'grind') return;
       stopAll();
       const token = (current = { stop: false, kind: 'grind' });
+      keepOn = true;
       emit('state', { running: 'grind' });
       const r = await grind(token, opts || {});
       report(T('log.grindResult', { r }));
+      if (r === 'complete') keepOn = false;
       if (r === 'blocked' && !token.stop && current === token && await reloadBlocked(token)) return;
       if (current === token) stopAll(false);
     },
@@ -1559,7 +1566,7 @@
     restarted: (d) => report(T('log.restarted', { cause: T('cause.' + (d?.cause || 'closed'), { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn'),
     stop: () => { stopAll(); report(T('log.stopped')); },
     // outra aba assumiu o grind: para aqui sem desligar o grind salvo
-    yield: () => { if (current?.kind === 'grind') { stopAll(false); report(T('log.otherTab'), 'warn'); } },
+    yield: () => { keepOn = false; if (current?.kind === 'grind') { stopAll(false); report(T('log.otherTab'), 'warn'); } },
     // v0.17.0: versão URGENTE no GitHub → pausa o que estiver rodando (o grind salvo continua ligado e
     // retoma sozinho depois da atualização)
     pause: () => { if (current) { stopAll(false); report(T('log.updUrgent'), 'warn'); } },

@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.8': [
+      'Quando o Midas recarrega a página no meio de uma lição (atualização, vigia), o aviso "Atualizar o site?" não aparece mais e o grind não fica parado esperando clique.',
+    ],
     '0.19.7': [
       'Exercícios de completar a frase digitando que vinham sem a palavra da lacuna agora são respondidos. Antes eram pulados, e nos Titãs a lição inteira era abandonada.',
     ],

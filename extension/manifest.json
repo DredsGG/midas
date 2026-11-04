@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Midas",
-  "version": "0.19.7",
+  "version": "0.19.8",
   "description": "__MSG_appDesc__",
   "permissions": [
     "storage",
@@ -32,6 +32,16 @@
     "128": "images/icon-128.png"
   },
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.duolingo.com/*"
+      ],
+      "js": [
+        "src/unload.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://www.duolingo.com/*"

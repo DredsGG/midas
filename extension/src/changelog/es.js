@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.8': [
+      'Cuando Midas recarga la página en mitad de una lección (actualización, vigilancia), ya no aparece el aviso "¿Volver a cargar el sitio?" y el grind no se queda esperando un clic.',
+    ],
     '0.19.7': [
       'Los ejercicios de completar la frase escribiendo que venían sin la palabra del hueco ahora se responden. Antes se saltaban, y en Legendario se abandonaba la lección entera.',
     ],

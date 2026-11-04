@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.8': [
+      'When Midas reloads the page in the middle of a lesson (update, watchdog), the "Reload site?" prompt no longer shows up and the grind no longer waits for a click.',
+    ],
     '0.19.7': [
       'Fill-in-the-blank typing exercises that came without the missing word are now answered. Before they were skipped, and in Legendary the whole lesson was dropped.',
     ],
