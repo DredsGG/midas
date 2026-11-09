@@ -21,6 +21,7 @@
     ui: { open: true, logOpen: false, x: null, y: null, ...loadUi() },
     upd: {}, updStatus: null, // alp_update (do service worker) + estado do último clique
     seen: null, seenLoaded: false, // v0.15.0: alp_seen (tutorial e novidades já vistos)
+    outage: null, // v0.19.9: queda do Duolingo (alp_outage), vinda do service worker pela ponte
   };
   const OB = () => window[Symbol.for('alp.onboard')];
   const SUP = () => window[Symbol.for('alp.support')]; // v0.19.5: quadro "Apoiar ♥" (regra 16)
@@ -240,6 +241,7 @@
   /* "lv-": a classe "info" do log colidia com o botão "i" de ajuda (v0.9.0) */
   pre .lv-warn { color: var(--bee); } pre .lv-error { color: var(--cardinal); }
   .unk { margin-top: 8px; font-size: 11px; color: var(--hare); }
+  .outage { margin: 8px 0 0; font-size: 12px; font-weight: 700; color: var(--bee); overflow-wrap: anywhere; }
   /* "i" de ajuda, discreto, no estilo Duolingo; o balão abre no hover/foco/toque */
   .info { width: 18px; height: 18px; flex: none; display: inline-grid; place-items: center; padding: 0; margin-left: 6px;
     border-radius: 50%; border: 2px solid var(--swan); background: transparent; color: var(--hare);
@@ -378,6 +380,7 @@
             <div><b data-s="eta">–</b><span class="ttl">${tx('stat.eta')}${info('help.stats')}</span></div>
           </div>
           <p class="now"></p>
+          <p class="outage" hidden></p>
           <p class="note" hidden></p>
         </div>
         <div class="card">
@@ -749,6 +752,10 @@
         ? `${r === 'grind' ? '' : esc(T('now.next')) + ' '}<b>${esc(T(c.mode === 'normal' ? 'mode.lesson' : 'mode.legendary'))}</b> · ${esc(T('now.where', { u: c.u + 1, n: c.li + 1 }))} · ${esc(typeName(c.type))} · ${esc(c.name || '')}`
         : esc(T(r === 'grind' ? 'now.reading' : 'now.none'));
     }
+    // v0.19.9: uma linha de status enquanto o Duolingo estiver fora do ar (ou sem internet)
+    const ou = $('.outage');
+    ou.textContent = state.outage ? I18N.outText?.(state.outage) || '' : '';
+    ou.hidden = !ou.textContent;
     const cfg = API()?.cfg;
     if (cfg) {
       const d = $('[data-c="delay"]'), h = $('[data-c="humanize"]');
@@ -775,6 +782,8 @@
   // Só o que ajuda a corrigir: versão, navegador, onde o grind estava e o fim do log.
   // Nada da conta (sem usuário, e-mail, token ou cookie).
   const GH_NEW = 'https://github.com/DredsGG/midas/issues/new';
+  // v0.19.9: havia queda do Duolingo ativa e há quanto tempo (só tipo, minutos e tentativas: sem resposta, sem conta)
+  const outageMeta = (o) => `Outage: ${o ? `${o.kind || 'down'} · ${Math.max(0, Math.round((Date.now() - (o.since || Date.now())) / 60e3))} min · probes ${o.probes || 0}` : 'none'}`;
   const bugReport = (what, maxLog = 80) => {
     const ua = navigator.userAgent;
     const chrome = (ua.match(/Chrome\/([\d.]+)/) || [])[1] || '?';
@@ -790,6 +799,7 @@
       p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
       `Page: ${location.pathname} · status ${st} · challenge ${ch}`,
       state.unknown.size ? `New types: ${[...state.unknown].join(', ')}` : '',
+      outageMeta(state.outage),
     ].filter(Boolean).join('\n');
     const log = state.logs.slice(-maxLog).map((l) =>
       `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${scrub(l.msg)}`);
@@ -865,6 +875,7 @@
         for (const k of Object.keys(data?.unknown || {})) state.unknown.add(k);
         if (data && 'seen' in data) { state.seen = data.seen || null; state.seenLoaded = true; setTimeout(() => maybeOnboard(), 400); }
         break;
+      case 'outage': state.outage = data || null; break; // v0.19.9
       case 'config': break; // render relê API().cfg
       case 'theme': setTheme(data); return;
       case 'stale': state.stale = true; break;

@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.19.8-f5b301)
+![Version](https://img.shields.io/badge/version-0.19.9-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/hud-auto-grind.png" width="420" alt="Midas HUD inside Duolingo: Auto Grind progress with legendary, left and estimate counters, current lesson buttons, speed presets and the live log">
@@ -24,6 +24,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
   - if the next lesson node doesn't show up on the page (it happens in background tabs), it opens the lesson by its direct address; if the page shows a different node as active (another tab moved the course on), it reloads once to get a fresh path;
   - a speaking exercise that can't be skipped makes it leave the lesson and reload; after 3 tries on the same node it moves on and comes back at the hourly restart;
   - a background watchdog reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs;
+  - if Duolingo itself is down (server errors) or your internet drops, Midas does not treat it as a stuck grind: after two failures in a minute it checks the site with a light request that carries no cookie or account data, then waits and checks again at 1, 2, 5, 10, 20 and 30 minutes, without reloading in a loop, skipping nodes or dropping the lesson (it repeats the same exercise), and resumes when the site answers. After 6 hours it goes back to the normal behavior. The log and the HUD show it (*Duolingo is down (error 503): waiting 5 min*), and the time estimate ignores the outage;
   - if the grind stops without **Stop** being pressed, it starts again by itself: every 10 minutes Midas checks it, and if the grind tab was closed or the browser was restarted it opens Duolingo in a background tab (without taking focus); if the tab is still open but the grind stopped, it reloads it; if there's no progress for 15 minutes it treats the grind as stuck and reloads. Every restart goes to the log with date, time and reason. Switch: **Restart automatically if it stops** (on by default, in the HUD and the popup); after an update the grind comes back right away;
   - only one Duolingo tab grinds at a time, and when Duolingo asks for a streak goal it picks the highest one.
   - on a brand-new course it answers Duolingo's welcome questions by itself (lowest level, start from scratch) and goes straight into the first lesson.

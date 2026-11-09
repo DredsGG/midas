@@ -88,6 +88,7 @@
       'log.frozen': 'o Chrome congelou a aba em segundo plano (Economia de energia): o Midas recarregou a página e o grind continua',
       'log.hourlyReload': 'reinício programado (1 h rodando): recarregando a página, o grind continua',
       'log.blockedReload': 'travado: recarregando a página em {s} s e continuando',
+      'log.outDown': 'Duolingo fora do ar (erro {code}): esperando {m} min (tentativa {n})', 'log.outDownNoCode': 'Duolingo fora do ar (sem resposta): esperando {m} min (tentativa {n})', 'log.outOffline': 'Sem internet: esperando', 'log.outBack': 'Duolingo voltou: retomando', 'log.outCap': 'Duolingo fora do ar há mais de 6 h: o Midas volta ao comportamento normal', 'log.refusedRetry': 'o Duolingo não abriu a lição (erro {status}); tentando o mesmo nó de novo',
       'log.restarted': 'grind reiniciado sozinho em {when}: {cause}',
       'cause.closed': 'a aba do grind foi fechada; o Duolingo abriu numa aba em segundo plano',
       'cause.startup': 'o navegador foi reiniciado',
@@ -229,6 +230,7 @@
       'log.frozen': 'Chrome froze the background tab (Energy Saver): Midas reloaded the page and the grind continues',
       'log.hourlyReload': 'scheduled restart (1 h running): reloading the page, grind continues',
       'log.blockedReload': 'blocked: reloading the page in {s} s and continuing',
+      'log.outDown': 'Duolingo is down (error {code}): waiting {m} min (attempt {n})', 'log.outDownNoCode': 'Duolingo is down (no response): waiting {m} min (attempt {n})', 'log.outOffline': 'No internet: waiting', 'log.outBack': 'Duolingo is back: resuming', 'log.outCap': 'Duolingo has been down for over 6 h: Midas goes back to its normal behavior', 'log.refusedRetry': 'Duolingo did not open the lesson (error {status}); trying the same node again',
       'log.restarted': 'grind restarted automatically on {when}: {cause}',
       'cause.closed': 'the grind tab was closed; Duolingo opened in a background tab',
       'cause.startup': 'the browser was restarted',
@@ -370,6 +372,7 @@
       'log.frozen': 'Chrome congeló la pestaña en segundo plano (Ahorro de energía): Midas recargó la página y el grind sigue',
       'log.hourlyReload': 'reinicio programado (1 h en marcha): recargando la página, el grind sigue',
       'log.blockedReload': 'atascado: recargando la página en {s} s y continuando',
+      'log.outDown': 'Duolingo caído (error {code}): esperando {m} min (intento {n})', 'log.outDownNoCode': 'Duolingo caído (sin respuesta): esperando {m} min (intento {n})', 'log.outOffline': 'Sin internet: esperando', 'log.outBack': 'Duolingo volvió: retomando', 'log.outCap': 'Duolingo lleva más de 6 h caído: Midas vuelve a su comportamiento normal', 'log.refusedRetry': 'Duolingo no abrió la lección (error {status}); probando el mismo nodo de nuevo',
       'log.restarted': 'grind reiniciado automáticamente el {when}: {cause}',
       'cause.closed': 'se cerró la pestaña del grind; Duolingo se abrió en una pestaña en segundo plano',
       'cause.startup': 'el navegador se reinició',
@@ -466,6 +469,13 @@
     get lang() { return lang; },
     get locale() { return LOCALES[lang]; },
     t, setLang, langs: LANGS,
+    // v0.19.9: frase da queda do Duolingo (log e linha da HUD). Sem endereço de API nem número de conta.
+    outText: (o) => {
+      if (!o) return '';
+      if (o.kind === 'offline') return t('log.outOffline');
+      const w = [1, 2, 5, 10, 20, 30][Math.min(Math.max((o.probes || 1) - 1, 0), 5)];
+      return t(o.code ? 'log.outDown' : 'log.outDownNoCode', { code: o.code, m: w, n: o.probes || 1 });
+    },
     onChange: (fn) => { subs.add(fn); return () => subs.delete(fn); },
   });
   if (typeof window !== 'undefined') Object.defineProperty(window, KEY, { value: api });

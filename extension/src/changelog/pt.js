@@ -4,6 +4,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.9': [
+      'Quando o Duolingo cai (erro do servidor) ou a internet some, o Midas espera e confere de novo com intervalo crescente, em vez de recarregar a página em série, pular nó ou abandonar a lição; quando o site volta, ele retoma sozinho.',
+      'A queda não entra na estimativa de tempo como ritmo ruim.',
+    ],
     '0.19.8': [
       'Quando o Midas recarrega a página no meio de uma lição (atualização, vigia), o aviso "Atualizar o site?" não aparece mais e o grind não fica parado esperando clique.',
     ],

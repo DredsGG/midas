@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ───────── relatar bug (v0.14.0) ─────────
   const bugReport = async (what, maxLog = 80) => {
-    const st = await chrome.storage.local.get(['alp_log', 'alp_progress', 'alp_update', 'alp_cfg', 'alp_running', 'alp_unknown']);
+    const st = await chrome.storage.local.get(['alp_log', 'alp_progress', 'alp_update', 'alp_cfg', 'alp_running', 'alp_unknown', 'alp_outage']);
     const ua = navigator.userAgent;
     const chromeV = (ua.match(/Chrome\/([\d.]+)/) || [])[1] || '?';
     const os = /Windows NT 10/.test(ua) ? 'Windows 10/11' : /Windows/.test(ua) ? 'Windows' : /Mac OS X/.test(ua) ? 'macOS' : /CrOS/.test(ua) ? 'ChromeOS' : /Linux/.test(ua) ? 'Linux' : '?';
@@ -240,6 +240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       c ? `Now: unit ${c.u + 1}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
       p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
       unk.length ? `New types: ${unk.join(', ')}` : '',
+      // v0.19.9: queda do Duolingo ativa e há quanto tempo (sem resposta nem dados da conta)
+      `Outage: ${st.alp_outage ? `${st.alp_outage.kind || 'down'} · ${Math.max(0, Math.round((Date.now() - (st.alp_outage.since || Date.now())) / 60e3))} min · probes ${st.alp_outage.probes || 0}` : 'none'}`,
     ].filter(Boolean).join('\n');
     const log = (st.alp_log || []).slice(-maxLog).map((l) => `${new Date(l.t).toLocaleTimeString('pt-BR')} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${String(l.msg).replace(/\/users\/\d+/g, '/users/…').replace(/\?fields=\S+/g, '')}`);
     return { what: String(what || '').trim(), meta, log, diag: `${meta}\n\nLog:\n${log.join('\n')}` };

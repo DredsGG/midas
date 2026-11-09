@@ -152,10 +152,11 @@ const watchDisk = async () => {
 // fecha a aba travada e abre outra no /learn (o grind retoma sozinho).
 const STALE_MS = 4 * 60e3;
 const watchGrind = async () => {
-  const { alp_grind, alp_beat, alp_lock } = await chrome.storage.local.get(['alp_grind', 'alp_beat', 'alp_lock']);
+  const { alp_grind, alp_beat, alp_lock, alp_outage } = await chrome.storage.local.get(['alp_grind', 'alp_beat', 'alp_lock', 'alp_outage']);
   // grind parado de propósito (ou que terminou sozinho) solta o alp_lock; aba congelada não solta
   if (!alp_grind?.active || !alp_beat?.tabId || !alp_lock) return;
   try { if ((await chrome.tabs.get(alp_beat.tabId)).frozen) return onFrozen(alp_beat.tabId); } catch { /* aba fechada: segue abaixo */ }
+  if (alp_outage) return; // v0.19.9: Duolingo fora do ar não é aba travada (a espera é da queda, não recarrega)
   if (Date.now() - alp_beat.at < STALE_MS) return;
   if (alp_beat.kickAt && Date.now() - alp_beat.kickAt < STALE_MS) return; // espera a última ação surtir efeito
   let tab = null;
@@ -239,12 +240,13 @@ const lifeOn = async () => {
 };
 const watchLife = async (trigger = 'tick') => {
   if (!(await lifeOn())) return;
-  const { alp_lock, alp_beat, alp_step, alp_restarts = [] } = await chrome.storage.local.get(['alp_lock', 'alp_beat', 'alp_step', 'alp_restarts']);
+  const { alp_lock, alp_beat, alp_step, alp_restarts = [], alp_outage } = await chrome.storage.local.get(['alp_lock', 'alp_beat', 'alp_step', 'alp_restarts', 'alp_outage']);
   const now = Date.now();
   if (alp_lock && now - alp_lock.at < LOCK_FRESH_MS) {
     // rodando: confere se está avançando
     const tab = await tabOrNull(alp_beat?.tabId);
     if (!tab || !alp_step?.at) return;
+    if (alp_outage) return; // v0.19.9: sem avanço porque o Duolingo está fora do ar: não é "travado" (o relógio zera quando a queda acaba)
     if (now < (alp_step.waitUntil || 0) + 60e3) return; // dentro da espera "travado: recarregando em N s"
     if (now - alp_step.at < STUCK_MS) return;
     if (alp_step.kickAt && now - alp_step.kickAt < STUCK_MS) return; // espera o último empurrão surtir efeito
@@ -275,11 +277,102 @@ const watchLife = async (trigger = 'tick') => {
 // navegador aberto de novo com o grind ligado: as abas restauradas retomam sozinhas (e registram
 // "navegador reiniciado"); se nenhuma assumir em 1,5 min, a vigia abre o /learn.
 const onBoot = async () => {
+  await chrome.storage.local.remove(['alp_outage', 'alp_outage_fails', 'alp_outage_cap']); // v0.19.9: queda de antes de fechar o navegador não vale mais
   if (!(await lifeOn())) return;
   await chrome.storage.local.remove(['alp_beat', 'alp_lock']); // ids de aba e lock da sessão anterior não valem mais
   await noteRestart('startup');
   chrome.alarms.create('alp-life-boot', { delayInMinutes: 1.5 });
 };
+
+// v0.19.9 — "Duolingo fora do ar" não é "Midas travado" (pedido do André em 2026-11-09).
+// A página avisa cada falha de leitura/sessão (5xx ou erro de rede). Aqui:
+// - 2 falhas em até 60 s E a sonda falhando = queda declarada (uma falha isolada não é queda);
+// - navigator.onLine === false é "sem internet": mesma espera, mensagem diferente;
+// - alp_outage {since, probes, nextAt, kind: 'down'|'offline', code} é visível a todas as abas;
+// - espera crescente com sonda a cada passo: 1, 2, 5, 10, 20, 30 min (teto 30); a 1ª sonda que
+//   responde encerra a queda (zera o estado, o relógio de "sem avanço" da vigia e avisa as abas);
+// - queda declarada há mais de 6 h: volta ao comportamento de antes (pode ser o lado do André) e
+//   registra em alp_restarts (causa 'outageCap'); a trava só solta quando o site responder de novo.
+// Sonda: GET https://www.duolingo.com/robots.txt (826 B, texto estático servido pelo mesmo
+// servidor do site; escolhido por ser o mais leve que a própria Duolingo serve sem conta: o /health
+// responde 0 B mas parece ser do balanceador e não prova que o site responde), com
+// credentials:'omit' e referrer vazio: sem cookie, sem conta, sem e-mail/ID, sem consulta no endereço.
+const OUT_WAITS_MIN = [1, 2, 5, 10, 20, 30];
+const OUT_FAIL_WIN_MS = 60e3;
+const OUT_MAX_MS = 6 * 3600e3;
+const OUT_PROBE_MS = 8000;
+const OUT_PROBE_URL = 'https://www.duolingo.com/robots.txt';
+const probeSite = async () => {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), OUT_PROBE_MS);
+  try {
+    const r = await fetch(OUT_PROBE_URL, { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', signal: ac.signal });
+    // 5xx = fora do ar; qualquer outra resposta (2xx, 4xx) = o site está respondendo
+    return { ok: r.status < 500, status: r.status };
+  } catch { return { ok: false, status: 0 }; } // sem rede, erro de DNS/TLS ou passou de 8 s
+  finally { clearTimeout(timer); }
+};
+let outQueue = Promise.resolve();
+const outSerial = (fn) => (outQueue = outQueue.then(fn, fn)); // um sinal de cada vez (várias abas, falhas juntas)
+const outAlarm = (when) => { try { chrome.alarms.create('alp-outage', { when }); } catch { /* o tick de 1 min cobre */ } };
+const outDeclare = async (kind, code, now) => {
+  const o = { since: now, probes: 1, nextAt: now + OUT_WAITS_MIN[0] * 60e3, kind, code: code || 0 };
+  await chrome.storage.local.set({ alp_outage: o });
+  await chrome.storage.local.remove('alp_outage_fails');
+  outAlarm(o.nextAt);
+  return o;
+};
+const outEnd = async (why, o) => {
+  const now = Date.now();
+  const { alp_step, alp_restarts = [] } = await chrome.storage.local.get(['alp_step', 'alp_restarts']);
+  const set = { alp_outage_end: { at: now, why, since: o?.since || now } };
+  // a queda não pode virar "15 min sem avanço" logo depois: o relógio da vigia recomeça agora
+  if (alp_step) set.alp_step = { ...alp_step, at: now, waitUntil: 0, kickAt: 0 };
+  if (why === 'cap') {
+    set.alp_outage_cap = { at: now };
+    set.alp_restarts = alp_restarts.concat({ at: now, cause: 'outageCap', ver: current(), mins: Math.round((now - (o?.since || now)) / 60e3) }).slice(-50);
+  }
+  await chrome.storage.local.set(set); // o aviso de fim vai antes de apagar a queda (a aba lê os dois)
+  await chrome.storage.local.remove(['alp_outage', 'alp_outage_fails']);
+  try { chrome.alarms.clear('alp-outage'); } catch { /* ok */ }
+};
+const onOutageFail = ({ kind, code } = {}) => outSerial(async () => {
+  const { alp_outage, alp_outage_cap, alp_outage_fails = [], alp_outage_probeAt = 0 } =
+    await chrome.storage.local.get(['alp_outage', 'alp_outage_cap', 'alp_outage_fails', 'alp_outage_probeAt']);
+  if (alp_outage) return { outage: alp_outage };
+  if (alp_outage_cap) return { outage: null, capped: true };
+  const now = Date.now();
+  // sem internet: sem sonda e sem contar falhas (o navegador já sabe). Confere no próprio service worker.
+  if (kind === 'offline' && typeof navigator !== 'undefined' && navigator.onLine === false) return { outage: await outDeclare('offline', 0, now) };
+  const fails = alp_outage_fails.filter((f) => now - f.at <= OUT_FAIL_WIN_MS).concat({ at: now, code: Number(code) || 0 });
+  await chrome.storage.local.set({ alp_outage_fails: fails });
+  if (fails.length < 2) return { outage: null };
+  if (now - alp_outage_probeAt < 10e3) return { outage: null }; // acabou de sondar e o site respondeu
+  await chrome.storage.local.set({ alp_outage_probeAt: now });
+  const pr = await probeSite();
+  if (pr.ok) return { outage: null };
+  const lastCode = fails.slice().reverse().find((f) => f.code)?.code || pr.status || 0;
+  const k = typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'down';
+  return { outage: await outDeclare(k, lastCode, Date.now()) };
+});
+const onOutageOk = () => outSerial(async () => {
+  await chrome.storage.local.remove(['alp_outage_fails', 'alp_outage_cap']); // a página falou com o site: zera as falhas e solta a trava das 6 h
+  return { ok: true };
+});
+const outageStep = () => outSerial(async () => {
+  const { alp_outage: o } = await chrome.storage.local.get('alp_outage');
+  if (!o) return;
+  const now = Date.now();
+  if (now - o.since > OUT_MAX_MS) return outEnd('cap', o);
+  if (now < o.nextAt - 2000) return; // o tick de 1 min chegou antes da hora
+  const pr = await probeSite();
+  if (pr.ok) return outEnd('up', o);
+  const probes = o.probes + 1;
+  const next = Date.now() + OUT_WAITS_MIN[Math.min(probes - 1, OUT_WAITS_MIN.length - 1)] * 60e3;
+  const kind = typeof navigator !== 'undefined' && navigator.onLine === false ? 'offline' : 'down';
+  await chrome.storage.local.set({ alp_outage: { ...o, probes, nextAt: next, kind, code: pr.status || o.code || 0 } });
+  outAlarm(next);
+});
 
 const schedule = () => {
   chrome.alarms.create('alp-update', { delayInMinutes: 1, periodInMinutes: CHECK_EVERY_MIN });
@@ -288,7 +381,8 @@ const schedule = () => {
 };
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === 'alp-update') checkUpdate();
-  if (a.name === 'alp-disk') { watchDisk(); watchGrind(); }
+  if (a.name === 'alp-disk') { watchDisk(); watchGrind(); outageStep(); } // o tick de 1 min também move a espera da queda (reserva do alarme)
+  if (a.name === 'alp-outage') outageStep();
   if (a.name === 'alp-life') watchLife('tick');
   if (a.name === 'alp-life-confirm') watchLife('confirm');
   if (a.name === 'alp-life-boot') watchLife('boot');
@@ -296,6 +390,8 @@ chrome.alarms.onAlarm.addListener((a) => {
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.cmd === 'beat') { onBeat(sender?.tab?.id); return false; }
+  if (msg?.cmd === 'outageFail') { onOutageFail(msg).then(reply, () => reply({ outage: null })); return true; }
+  if (msg?.cmd === 'outageOk') { onOutageOk().then(reply, () => reply({ ok: false })); return true; }
   if (msg?.cmd === 'updCheck') { checkUpdate({ soft: !!msg.soft }).then(reply); return true; }
   if (msg?.cmd === 'openGuide') { chrome.tabs.create({ url: chrome.runtime.getURL('COMO-INSTALAR.html') + (msg.hash || '') }).then(() => reply({ ok: true })); return true; }
   if (msg?.cmd === 'updApply') { applyUpdate().then(reply, (e) => reply({ status: 'error', error: String(e?.message || e) })); return true; }

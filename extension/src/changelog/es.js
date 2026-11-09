@@ -3,6 +3,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.9': [
+      'Cuando Duolingo se cae (error del servidor) o se va el internet, Midas espera y vuelve a comprobar con intervalos crecientes, en vez de recargar la página en serie, saltar nodos o abandonar la lección; cuando el sitio vuelve, retoma solo.',
+      'La caída no cuenta como ritmo lento en la estimación de tiempo.',
+    ],
     '0.19.8': [
       'Cuando Midas recarga la página en mitad de una lección (actualización, vigilancia), ya no aparece el aviso "¿Volver a cargar el sitio?" y el grind no se queda esperando un clic.',
     ],

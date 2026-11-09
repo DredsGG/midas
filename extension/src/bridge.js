@@ -44,8 +44,15 @@
     if (ch.alp_lang?.newValue) send('lang', ch.alp_lang.newValue);
     if (ch.alp_theme?.newValue) send('theme', ch.alp_theme.newValue);
     if (ch.alp_update?.newValue) { toHud('update', ch.alp_update.newValue); setUrgent(ch.alp_update.newValue); }
+    if ('alp_outage' in ch || 'alp_outage_cap' in ch) pushOutage(); // v0.19.9: queda do Duolingo começou/avançou/acabou (vale para todas as abas)
   });
 
+  // v0.19.9: Duolingo fora do ar. O estado mora no service worker (alp_outage); aqui só leva para a página.
+  // end = como a última queda acabou ('up' o site voltou; 'cap' passou de 6 h e o Midas volta ao normal)
+  const pushOutage = safe(async (ack) => {
+    const { alp_outage, alp_outage_end, alp_outage_cap } = await chrome.storage.local.get(['alp_outage', 'alp_outage_end', 'alp_outage_cap']);
+    send('outage', { state: alp_outage || null, end: alp_outage ? null : alp_outage_end || null, capped: !!alp_outage_cap, ack });
+  });
   // v0.13.0: atualizações (o service worker procura no GitHub; aqui só leva e traz para a HUD)
   const toHud = (type, data) => fire('alp:out', { type, data });
   const pushUpdate = safe(async () => {
@@ -145,8 +152,20 @@
         await pushConfig();
         await pushLang();
         await hydrate();
+        await pushOutage();
         await maybeResume();
         await pushUpdate();
+        break;
+      }
+      case 'outageFail': {
+        // v0.19.9: falha de leitura/sessão do Duolingo (5xx ou rede): o service worker decide se é queda
+        const r = await chrome.runtime.sendMessage({ cmd: 'outageFail', kind: data?.kind, code: data?.code }).catch(() => null);
+        const { alp_outage_end } = await chrome.storage.local.get('alp_outage_end');
+        send('outage', { state: r?.outage || null, end: r?.outage ? null : alp_outage_end || null, capped: !!r?.capped, ack: data?.id });
+        break;
+      }
+      case 'outageOk': {
+        await chrome.runtime.sendMessage({ cmd: 'outageOk' }).catch(() => {});
         break;
       }
       case 'updCheck': {
@@ -285,6 +304,6 @@
   pushLang();
   // o script da página carrega antes da ponte e o 'ready' dele se perde: manda os dados assim mesmo.
   // v0.16.0: o estado da atualização também (antes só ia no 'ready', e o aviso não aparecia ao abrir a página)
-  setTimeout(() => { hydrate(); pushUpdate(); softCheck(); }, 300);
+  setTimeout(() => { hydrate(); pushUpdate(); pushOutage(); softCheck(); }, 300);
   maybeResume();
 })();

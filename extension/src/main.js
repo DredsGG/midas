@@ -139,10 +139,99 @@
     return props?.challenge ? { props, ch: props.challenge } : null;
   };
 
+  // ───────────────────────── Duolingo fora do ar (v0.19.9) ─────────────────────────
+  // O service worker decide (2 falhas em até 60 s + sonda falhando = queda; ver background.js) e guarda
+  // o estado em alp_outage; a ponte entrega aqui em commands.outage. Enquanto durar, o grind espera
+  // (sem recarregar, sem pular nó, sem abandonar lição, sem contar como travado) e a lição repete
+  // o MESMO exercício. Falha isolada (5xx ou rede) segue o comportamento de sempre.
+  let outage = null, outageEnd = null, outageCapped = false;
+  const outageNow = () => !!outage;
+  const alive = () => { try { return keepOn || !!current; } catch { return false; } };
+  const outageAcks = new Map();
+  let outageSeq = 0, lastFailAt = 0, okPending = false, settling = null, capSentAt = 0;
+  const offlineNow = () => navigator.onLine === false;
+  // avisa UMA falha ao service worker (cada pedido que falhou conta uma vez, só aqui) e devolve a decisão (até 15 s);
+  // devolve se há queda declarada. Quem só precisa saber o resultado (os catch dos laços) usa settled(), que não conta de novo.
+  const sendFail = (kind, code = 0) => {
+    kind = kind || (offlineNow() ? 'offline' : 'down');
+    if (!alive() || outageCapped) return Promise.resolve(outageNow());
+    lastFailAt = Date.now();
+    okPending = true;
+    if (outage) return Promise.resolve(true);
+    const id = ++outageSeq;
+    emit('outageFail', { kind, code, id });
+    const mine = new Promise((res) => { outageAcks.set(id, res); setTimeout(() => { if (outageAcks.delete(id)) res(); }, 15000); })
+      .then(() => outageNow());
+    settling = mine;
+    return mine;
+  };
+  const settled = () => (settling || Promise.resolve()).then(() => outageNow());
+  // o site respondeu bem: zera as falhas pendentes (ou solta a trava das 6 h)
+  const okSignal = () => {
+    if (!(okPending || outageCapped) || Date.now() - capSentAt < 5000) return;
+    okPending = false; capSentAt = Date.now();
+    emit('outageOk', {});
+  };
+  // página de erro/manutenção no lugar do app (heurística: sem nenhum data-test e texto curto com 50x/manutenção)
+  const siteErrorPage = () => {
+    try {
+      if (document.querySelector('[data-test]')) return 0;
+      const txt = ((document.title || '') + ' ' + (document.body?.innerText || '')).replace(/\s+/g, ' ').trim();
+      if (!txt || txt.length > 500) return 0;
+      const m = txt.match(/\b(50[0234])\b|service unavailable|bad gateway|gateway time-?out|temporarily unavailable|under maintenance|em manuten|manuten[cç][aã]o|mantenimiento/i);
+      return m ? (+m[1] || 503) : 0;
+    } catch { return 0; }
+  };
+  const outLine = (o) => window[Symbol.for('alp.i18n')]?.outText?.(o) || '';
+  // uma linha no log a cada passo da espera (mesma frase da HUD), logo que o estado chega, mesmo no meio de uma lição
+  let outLogged = -1;
+  const logOutage = () => {
+    if (!outage) { outLogged = -1; return; }
+    if (outage.probes !== outLogged) { outLogged = outage.probes; report(outLine(outage), 'warn'); }
+  };
+  // a queda acabou (commands.outage): aviso no log e a queda sai da conta do ritmo e do relógio da rodada.
+  // Só a aba que roda o grind faz isso (o histórico alp.rate é compartilhado entre as abas).
+  const onOutageOver = (prev) => {
+    outLogged = -1;
+    if (!alive()) return;
+    if (outageEnd?.why === 'cap') { report(T('log.outCap'), 'warn'); return; }
+    const total = Math.max(0, Date.now() - (prev?.since || Date.now()));
+    report(T('log.outBack'));
+    rateShift(total);               // a queda não conta como ritmo ruim nem abre "buraco" no histórico
+    grindState.startedAt += total;  // nem no relógio da rodada (reinício de 1 h, média por nó)
+    // Retomada: aba do grind PARADA (fora de uma lição) recarrega UMA vez; em lição rodando, só segue.
+    if (current?.kind === 'grind' && !sessionVisible()) outageReload(prev?.since, blockedWaiting);
+  };
+  // recarrega a página uma única vez por queda (a marca fica no sessionStorage da aba, sobrevive à recarga)
+  let blockedWaiting = false;
+  const outageReload = (since, fresh) => {
+    const KEY = 'alp.outageReload', mark = String(since || 0);
+    let done = null;
+    try { done = sessionStorage.getItem(KEY); } catch { /* sem storage */ }
+    if (done === mark) return false;
+    try { sessionStorage.setItem(KEY, mark); } catch { /* idem */ }
+    emit('reloading', { fresh: !!fresh });
+    return true;
+  };
+  // espera a queda acabar (a página segue viva: o sinal de vida e o lock da aba continuam). Devolve o tempo esperado (ms).
+  const waitOutage = async (token) => {
+    const t0 = Date.now();
+    while (!token.stop && outage) {
+      logOutage();
+      await sleep(1000);
+    }
+    const dur = Date.now() - t0;
+    return dur;
+  };
+  const isDownErr = (e) => !!e && (e.net === true || e.status >= 500);
+  const isApiHost = (u) => { try { return /(^|\.)duolingo\.com$/.test(new URL(u, location.href).hostname); } catch { return false; } };
+  const API_PATH = /\/(sessions|users|2017-06-30|2023-05-23)(\/|\?|$)/;
+
   // ───────────────────────── erro ao criar sessão ─────────────────────────
   // Alguns nós (ex.: prática "Spaced Repetition") fazem o próprio Duolingo receber
   // 400/503 no POST /sessions — nem o clique manual funciona. Detecta na hora para
   // o grind pular em vez de ficar parado esperando.
+  // v0.19.9: 5xx e erro de rede também alimentam a detecção de queda (4xx continua só pulando o nó).
   let lastSessionError = null;
   // v0.13.4: Titãs da prática "Spaced Repetition". O site do Duolingo pede a sessão
   // LEGENDARY_LEXEME_PRACTICE com skillIds VAZIO (bug do próprio site → 400; o app do celular
@@ -170,17 +259,35 @@
         const u = typeof input === 'string' ? input : input?.url || '';
         if (/\/sessions(\?|$)/.test(u) && String(init?.method || '').toUpperCase() === 'POST') init = fixSrBody(init);
       } catch { /* ignora */ }
-      const res = await origFetch.call(this, input, init);
+      let res;
+      try { res = await origFetch.call(this, input, init); }
+      catch (e) {
+        // v0.19.9: erro de rede (não conta o que o próprio site cancelou)
+        try {
+          const url = typeof input === 'string' ? input : input?.url || '';
+          if (e?.name !== 'AbortError' && isApiHost(url) && API_PATH.test(url)) {
+            const method = String(init?.method || input?.method || 'GET').toUpperCase();
+            if (method === 'POST' && /\/sessions(\?|$)/.test(url)) lastSessionError = { status: 0, at: Date.now() };
+            sendFail(offlineNow() ? 'offline' : 'down', 0);
+          }
+        } catch { /* ignora */ }
+        throw e;
+      }
       try {
         const url = typeof input === 'string' ? input : input?.url || '';
         const method = String(init?.method || input?.method || 'GET').toUpperCase();
         if (method === 'POST' && /\/sessions(\?|$)/.test(url) && res.status >= 400) {
           lastSessionError = { status: res.status, at: Date.now() };
         }
+        if (isApiHost(url) && API_PATH.test(url)) {
+          if (res.status >= 500) sendFail('down', res.status);
+          else if (res.ok) okSignal();
+        }
       } catch { /* ignora */ }
       return res;
     };
   } catch { /* ignora */ }
+  window.addEventListener('offline', () => { if (alive()) sendFail('offline', 0); });
 
   // ───────────────────────── primitivas de input ─────────────────────────
   const setNativeValue = (el, value) => {
@@ -790,7 +897,7 @@
   ]);
 
   const runLesson = async (token, { timeoutMs = 8 * 60e3 } = {}) => {
-    const t0 = Date.now();
+    let t0 = Date.now();
     // o exercício respondido é identificado pelo próprio objeto do desafio: a troca
     // GUESSING → SLIDING → GUESSING pode ser mais rápida que o tick do loop
     let answeredCh = null, answeredAt = 0, idleSince = Date.now(), lastPress = 0, solvedCount = 0;
@@ -800,6 +907,20 @@
     const skipTries = new Map();
     let radioIdleSince = 0;
     const gone = goneFor(1500);
+    // v0.19.9: Duolingo fora do ar no meio da lição → espera e repete o MESMO exercício. Não é "sem solução":
+    // zera as contagens do exercício, não gasta o tempo máximo da lição e não abandona a lição.
+    // Falha isolada (sem queda declarada) segue como antes. Não manda sinal novo: só confere o que já foi avisado.
+    const pauseIfDown = async () => {
+      if (!outageNow()) {
+        if (!lastFailAt || Date.now() - lastFailAt > 90e3) return false;
+        if (settling) await settling;
+        if (!outageNow()) return false;
+      }
+      const dur = await waitOutage(token);
+      t0 += dur; idleSince = Date.now(); lastPress = 0; answeredCh = null; answeredAt = 0; resolveTries = 0;
+      radioDone = null; radioIdleSince = 0; solveCounts.clear(); skipTries.clear();
+      return true;
+    };
     // evita clique duplo no mesmo botão antes do React trocar de tela
     const press = () => {
       if (Date.now() - lastPress < Math.max(120, cfg.delay * 0.5)) return true;
@@ -808,7 +929,8 @@
       return true;
     };
     while (!token.stop) {
-      if (Date.now() - t0 > timeoutMs) { report(T('log.lessonTimeout'), 'warn'); return 'timeout'; }
+      if (outageNow() && (await pauseIfDown())) continue;
+      if (Date.now() - t0 > timeoutMs) { if (await pauseIfDown()) continue; report(T('log.lessonTimeout'), 'warn'); return 'timeout'; }
       if ($(STREAK_OPT) && (await handleStreakGoal())) { idleSince = Date.now(); continue; }
       if (funboardingOn() && (await handleFunboarding())) { idleSince = Date.now(); continue; }
       if (gone()) return 'done';
@@ -823,7 +945,7 @@
         // sem pergunta de rádio e sem botão por muito tempo = o loop não entende a tela
         if (rc || findNext()) radioIdleSince = 0;
         else if (!radioIdleSince) radioIdleSince = Date.now();
-        else if (Date.now() - radioIdleSince > 90000) { report(T('log.noNext', { status: 'RADIO' }), 'warn'); return 'stuck'; }
+        else if (Date.now() - radioIdleSince > 90000) { if (await pauseIfDown()) continue; report(T('log.noNext', { status: 'RADIO' }), 'warn'); return 'stuck'; }
         const key = rc && `${rc.type}:${rc.startTime ?? ''}:${rc.prompt ?? ''}`;
         if (rc && key !== radioDone && !answeredRadio.has(rc)) {
           if (await solveCurrent()) { radioDone = key; answeredRadio.add(rc); solvedCount++; await wait(Math.max(150, cfg.delay * 0.5)); }
@@ -864,6 +986,7 @@
               await sleep(300);
               continue;
             }
+            if (await pauseIfDown()) continue;
             report(T('log.stuckAbandon', { type: t }), 'error');
             return 'stuck';
           }
@@ -885,6 +1008,7 @@
             // sem fala → recarrega já, sem gastar tentativa do nó
             if (tries > 2 && /speak/i.test(t || '')) { report(T('log.speakReload'), 'warn'); return 'reload'; }
             if (tries > 4) {
+              if (await pauseIfDown()) continue;
               const all = $$(S.skip);
               report(T('log.skipFailed', { type: t, n: all.length, v: all.filter(isVisible).length, status }), 'error');
               emit('stuckType', { type: t });
@@ -897,6 +1021,7 @@
             answeredAt = Date.now();
           } else if (Date.now() - answeredAt > 15000) {
             // Titãs não tem "Pular": desiste da lição para o grind seguir em frente
+            if (await pauseIfDown()) continue;
             report(T('log.stuckAbandon', { type: t }), 'error');
             emit('stuckType', { type: t });
             return 'stuck';
@@ -907,7 +1032,7 @@
       } else {
         // GRADING, BLAMING, splashes, *_DUO, END_CAROUSEL, anúncios, status desconhecido
         if (press()) idleSince = Date.now();
-        else if (Date.now() - idleSince > 20000) { report(T('log.noNext', { status }), 'warn'); return 'stuck'; }
+        else if (Date.now() - idleSince > 20000) { if (await pauseIfDown()) continue; report(T('log.noNext', { status }), 'warn'); return 'stuck'; }
       }
       // loop rápido: o atraso configurado vale para as ações, não para "ver" o estado
       await sleep(cfg.humanize ? Math.max(60, jitter(cfg.delay * 0.35)) : 40);
@@ -922,14 +1047,17 @@
   };
   const shortPath = (p) => String(p).split('?')[0].replace(/\/users\/\d+/g, '/users/…');
   const api = async (path, opts = {}) => {
-    const res = await fetch(path, {
-      credentials: 'include',
-      ...opts,
-      headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/json', ...(opts.headers || {}) },
-    });
+    let res;
+    try {
+      res = await fetch(path, {
+        credentials: 'include',
+        ...opts,
+        headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/json', ...(opts.headers || {}) },
+      });
+    } catch (e) { if (e?.name !== 'AbortError') e.net = true; throw e; } // v0.19.9: erro de rede (candidato a queda)
     // v0.16.3: no log vai só o endereço curto, sem o número da conta e sem a consulta enorme
     // (a consulta inteira empurrava a HUD para os lados e o id da conta ia parar no "Relatar bug")
-    if (!res.ok) throw new Error(`${opts.method || 'GET'} ${shortPath(path)} → ${res.status}`);
+    if (!res.ok) { const err = new Error(`${opts.method || 'GET'} ${shortPath(path)} → ${res.status}`); err.status = res.status; throw err; }
     return res.json();
   };
 
@@ -1271,6 +1399,17 @@
     try { localStorage.setItem(RATE_KEY, JSON.stringify(h)); } catch { /* idem */ }
     return h;
   };
+  // v0.19.9: depois de uma queda do Duolingo, as amostras de antes andam para frente pelo tempo da queda: ela
+  // não vira "ritmo ruim" (passos parados por minutos) nem "buraco" de mais de 15 min que zera o histórico.
+  // Vale para qualquer queda que acabou sozinha (até 6 h); a de mais de 6 h volta ao comportamento de antes.
+  const rateShift = (ms) => {
+    if (!(ms > 0)) return;
+    let h = [];
+    try { h = JSON.parse(localStorage.getItem(RATE_KEY) || '[]'); } catch { return; }
+    if (!h.length) return;
+    const now = Date.now();
+    try { localStorage.setItem(RATE_KEY, JSON.stringify(h.map((x) => ({ ...x, t: Math.min(x.t + ms, now) })))); } catch { /* idem */ }
+  };
   const PACE_WIN = 90 * 60e3, PACE_MIN = 10 * 60e3;
   const pace = (h = null) => {
     if (!h) { try { h = JSON.parse(localStorage.getItem(RATE_KEY) || '[]'); } catch { h = []; } }
@@ -1353,6 +1492,15 @@
   // espera "travado" e recarrega a página (o grind retoma com a lista de pulos zerada). Usada quando o
   // laço devolve 'blocked' e quando a vigia acha o grind sem avanço (v0.19.0).
   const reloadBlocked = async (token) => {
+    // v0.19.9: com o Duolingo fora do ar não é "travado": espera a queda acabar, sem contar no backoff, e recarrega uma vez
+    if (outageNow()) {
+      const since = outage.since;
+      blockedWaiting = true;
+      try { await waitOutage(token); } finally { blockedWaiting = false; }
+      if (token.stop || current !== token) return false;
+      if (outageEnd?.why !== 'cap') { outageReload(since, true); return true; }
+      // passou de 6 h: volta ao comportamento de antes (espera de "travado" normal)
+    }
     const secs = blockedWait();
     report(T('log.blockedReload', { s: secs }), 'warn');
     emit('waiting', { until: Date.now() + secs * 1000 });
@@ -1370,6 +1518,7 @@
     // retomada automática após reload = mantém a lista salva
     grindState.skip = opts.resume ? { ...(opts.skip || {}) } : {};
     grindState.attempts = {};
+    grindState.sess5xx = {}; // v0.19.9: 5xx isolado no POST /sessions: 1ª vez tenta o mesmo nó de novo
     let cachedLevels = null, cachedCourse = null;
     let justPassedId = null, retry = null;
     grindState.startedAt = Date.now();
@@ -1378,7 +1527,7 @@
     while (!token.stop) {
       // v0.12.7: a cada 1 h de grind recarrega a página (entre nós, nunca no meio de lição)
       // e continua sozinho depois do reload
-      if (Date.now() - grindState.startedAt > RELOAD_EVERY_MS) {
+      if (!outageNow() && Date.now() - grindState.startedAt > RELOAD_EVERY_MS) {
         report(T('log.hourlyReload'));
         // v0.13.2: zera a lista de pulos — nó pulado (ex.: Titã que falhou 2x) não fica para trás
         // até o fim do caminho; volta a ser tentado pelo menos 1 vez por hora
@@ -1386,10 +1535,21 @@
         await sleep(60000); // a ponte recarrega; se não recarregar, segue o grind
         grindState.startedAt = Date.now();
       }
+      // v0.19.9: página de erro/manutenção no lugar do app conta como falha; com queda declarada, espera
+      const errCode = siteErrorPage();
+      if (errCode) await sendFail('down', errCode);
+      if (outageNow()) { await waitOutage(token); continue; }
       let levels = cachedLevels, course = cachedCourse;
       cachedLevels = null;
       if (!levels) try { ({ levels, course } = await fetchPath()); cachedCourse = course; }
-      catch (e) { report(T('log.pathFail', { e: e.message }), 'error'); await sleep(15000); continue; }
+      catch (e) {
+        // 5xx/erro de rede na leitura do caminho: o service worker decide se é queda (2 falhas + sonda)
+        if (isDownErr(e) && (await settled())) {
+          await waitOutage(token);
+          continue;
+        }
+        report(T('log.pathFail', { e: e.message }), 'error'); await sleep(15000); continue;
+      }
 
       const sum = summarize(levels);
       const target = pickTarget(levels, justPassedId, retry);
@@ -1430,6 +1590,27 @@
       const r = started === 'chest' ? 'chest' : await runSession(token);
       srOverride = null;
       if (token.stop) break;
+      // v0.19.9: POST /sessions com 5xx ou erro de rede (status 0). Queda declarada: espera e repete o MESMO nó, sem
+      // pular e sem contar tentativa. Isolado: a 1ª vez tenta o mesmo nó de novo; a 2ª é o comportamento de sempre
+      // (o ≥400 que pula o nó). 4xx não passa por aqui.
+      const sess = /^session-error-(\d+)$/.exec(String(r));
+      if (sess && (+sess[1] === 0 || +sess[1] >= 500)) {
+        const down = await settled();
+        if (down) {
+          await waitOutage(token);
+          if (token.stop) break;
+          retry = { id: lv.id, mode };
+          if (sessionVisible() || !onLearnPage()) await go('/learn');
+          continue;
+        }
+        const k = (grindState.sess5xx[lv.id] = (grindState.sess5xx[lv.id] || 0) + 1);
+        if (k === 1) {
+          report(T('log.refusedRetry', { status: +sess[1] || 'rede' }), 'warn');
+          retry = { id: lv.id, mode };
+          if (sessionVisible() || !onLearnPage()) await go('/learn');
+          continue;
+        }
+      }
       if (r === 'reload') {
         // v0.14.4: a mesma fala travando em loop (recarrega → volta a fala → recarrega) gira para
         // sempre. Na 3ª vez em 20 min no mesmo nó, pula o nó nesta hora (o reinício de 1 h zera a lista).
@@ -1457,16 +1638,21 @@
       // volta ao caminho e confere se o nó mudou de estado
       if (sessionVisible() || !onLearnPage()) await go('/learn');
       await sleep(700);
-      let after;
+      let after, wentDown = false;
       try {
         const fresh = await fetchPath();
         cachedLevels = fresh.levels; // reaproveita na próxima volta
         after = fresh.levels.find((l) => l.id === lv.id);
-      } catch { /* tenta na próxima volta */ }
+      } catch (e) { wentDown = isDownErr(e) && (await settled()); /* senão tenta na próxima volta */ }
+      if (wentDown) { // v0.19.9: o site caiu depois da lição: espera e repete o mesmo nó (não conta como "não avançou")
+        await waitOutage(token);
+        retry = { id: lv.id, mode };
+        continue;
+      }
       if (after && after.state === lv.state && (after.finishedSessions ?? 0) <= (lv.finishedSessions ?? 0)) {
         // o servidor às vezes demora a refletir: confere de novo antes de contar como falha
         await sleep(1500);
-        try { const again = await fetchPath(); cachedLevels = again.levels; after = again.levels.find((l) => l.id === lv.id); } catch {}
+        try { const again = await fetchPath(); cachedLevels = again.levels; after = again.levels.find((l) => l.id === lv.id); } catch (e) { if (isDownErr(e)) await settled(); }
       }
       // nó com várias lições (ex.: 1/4): o estado só muda na última — conta também
       // o avanço de finishedSessions como progresso (senão o grind pularia o nó)
@@ -1476,12 +1662,13 @@
         grindState.done++;
         try { localStorage.removeItem(BLOCK_KEY); } catch { /* sem storage */ }
         grindState.attempts[lv.id] = 0;
+        delete grindState.sess5xx[lv.id];
         if (mode === 'normal') justPassedId = lv.id; // emenda a Titãs do mesmo nó
       }
       else {
         if (String(r).startsWith('session-error')) {
           grindState.attempts[lv.id] = 1; // força o pulo abaixo
-          report(T('log.refused', { status: r.replace('session-error-', '') }), 'warn');
+          report(T('log.refused', { status: r.replace('session-error-', '') === '0' ? 'rede' : r.replace('session-error-', '') }), 'warn');
         }
         const n = (grindState.attempts[lv.id] = (grindState.attempts[lv.id] || 0) + 1);
         report(T('log.notAdvanced', { r, n }), 'warn');
@@ -1499,6 +1686,7 @@
     cfg, getStatus, getChallenge, solveCurrent, pressNext, skipChallenge, runLesson, runStory, runSession,
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
+    outageState: () => outage, waitOutage, sendFail, settled, rateShift, siteErrorPage, reloadBlocked, // v0.19.9 (testes)
     fillInputs, challengeRoot, diagTyped, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
@@ -1556,11 +1744,27 @@
     // renovado): larga o laço preso e entra na mesma espera "travado" (blockedWait) com recarga.
     // Não passa pelo stopAll: o lock continua com esta aba durante a espera.
     stuck: async (d) => {
-      if (current?.kind !== 'grind') return;
+      if (current?.kind !== 'grind' || outageNow()) return; // v0.19.9: queda do Duolingo não é travamento
       report(T('log.restarted', { cause: T('cause.stuck', { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn');
       current.stop = true;
       const token = (current = { stop: false, kind: 'grind' });
       if (!(await reloadBlocked(token)) && current === token) stopAll(false);
+    },
+    // v0.19.9: estado da queda do Duolingo vindo do service worker (via ponte). ack = resposta a um aviso de falha
+    outage: (d) => {
+      // resposta a um aviso de falha (ack) sem queda não apaga uma queda que a página já conhece
+      // (o estado "zerado" certo vem do storage); com queda, vale como qualquer atualização
+      const ackOnly = !!d?.ack && !d.state;
+      outageCapped = !!d?.capped;
+      if (!ackOnly) {
+        const prev = outage;
+        outage = d?.state || null;
+        outageEnd = d?.end || null;
+        if (prev && !outage) onOutageOver(prev);
+        else if (outage && alive()) logOutage();
+        emit('outage', outage); // HUD: linha de status
+      }
+      if (d?.ack) { const r = outageAcks.get(d.ack); outageAcks.delete(d.ack); r?.(); }
     },
     // v0.19.0: a página foi aberta/recarregada pela vigia: registra quando e por quê
     restarted: (d) => report(T('log.restarted', { cause: T('cause.' + (d?.cause || 'closed'), { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn'),

@@ -3,6 +3,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.9': [
+      'When Duolingo goes down (server error) or your internet drops, Midas waits and checks again at growing intervals instead of reloading the page over and over, skipping nodes or dropping the lesson; when the site is back, it resumes by itself.',
+      'The outage does not count against the time estimate as a slow pace.',
+    ],
     '0.19.8': [
       'When Midas reloads the page in the middle of a lesson (update, watchdog), the "Reload site?" prompt no longer shows up and the grind no longer waits for a click.',
     ],
