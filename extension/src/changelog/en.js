@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.15': [
+      "Typing exercises that complete a translation: when the field does not keep the text, Midas tries other ways of typing (including the way the browser types for real) before skipping the exercise, and the log says which way worked.",
+    ],
     '0.19.14': [
       "\"Next\" in the panel and popup shows the section and unit the way Duolingo shows them (\"section 4, unit 49\").",
       "With two Duolingo tabs open, no log line is lost, and a tab opened later no longer takes over the grind from the background tab.",
@@ -10,7 +13,7 @@
       "\"Copy\" in the log no longer includes the account number.",
     ],
     '0.19.13': [
-      "Typing exercises that complete a translation (\"Complete the translation\") are answered again. The blank field changed format on Duolingo and Midas could not find it: the exercise was skipped.",
+      "Typing exercises that complete a translation (\"Complete the translation\"): Midas also finds the blank field in its newer formats (field with no type, editable field).",
     ],
     '0.19.12': [
       "When a lesson or story does not open, the log says which screen was open (address, whether the tab was hidden and the elements on screen, without the answer words). It helps find what changed on Duolingo.",

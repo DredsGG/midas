@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.15': [
+      "Exercícios de completar a tradução digitando: quando o campo não fica com o texto, o Midas tenta outros jeitos de digitar (inclusive como o navegador digita de verdade) antes de pular o exercício, e o log diz qual jeito funcionou.",
+    ],
     '0.19.14': [
       "O \"Próximo\" no painel e no popup mostra a seção e a unidade como o Duolingo mostra (\"seção 4, unidade 49\").",
       "Com duas abas do Duolingo abertas, nenhuma linha do log se perde, e uma aba aberta depois não toma mais o grind da aba de trás.",
@@ -11,7 +14,7 @@
       "\"Copiar\" do log não leva mais o número da conta.",
     ],
     '0.19.13': [
-      "Exercícios de completar a tradução digitando (\"Complete a tradução\") voltam a ser respondidos. O campo da lacuna mudou de formato no Duolingo e o Midas não o achava: o exercício era pulado.",
+      "Exercícios de completar a tradução digitando (\"Complete a tradução\"): o Midas acha o campo da lacuna também nos formatos novos (campo sem tipo, campo editável).",
     ],
     '0.19.12': [
       "Quando uma lição ou história não abre, o log diz qual tela estava aberta (endereço, se a aba estava escondida e os elementos da tela, sem as palavras da resposta). Ajuda a achar sozinho o que mudou no Duolingo.",

@@ -514,16 +514,100 @@
     if (!inputs.length && root !== document) inputs = answerFields(null).filter((i) => !i.closest('[class*="DLP_"]'));
     if (inputs.length && inputs.length === answers.length) {
       inputs.forEach((inp, i) => typeInto(inp, answers[i]));
+      lastTyped = inputs.map((el, i) => ({ el, v: String(answers[i] ?? '') }));
       return true;
     }
     // fallback: cada input conhece seu token via fiber (fullText + damageStart)
     let ok = false;
+    lastTyped = [];
     for (const inp of inputs) {
       const tok = walkUp(fiberOf(inp), (f) =>
         f.pendingProps?.fullText !== undefined ? f.pendingProps : undefined, 8);
-      if (tok) { typeInto(inp, tok.fullText.substring(tok.damageStart ?? 0)); ok = true; }
+      if (tok) { const v = tok.fullText.substring(tok.damageStart ?? 0); typeInto(inp, v); lastTyped.push({ el: inp, v }); ok = true; }
     }
     return ok;
+  };
+
+  // v0.19.15: o campo certo é achado e o texto é posto, mas o Duolingo não fica com ele (o campo volta vazio, o
+  // "Verificar" não habilita e o exercício é pulado: "preenchidos 0" com "campos: input[type=text][challenge-text-input]",
+  // visto ao vivo em 12/11). Causa provável (inferida, não confirmada): o campo ignora o evento de digitação sintético.
+  // Resgate: só para campo que ficou vazio, tenta outros jeitos em ordem e para no primeiro que pega:
+  //   'exec' = inserir como o navegador insere ao digitar (execCommand insertText: o evento sai como digitação real);
+  //   'props' = chamar direto o onChange/onInput do React com um evento completo;
+  //   'keys' = tecla por tecla (keydown, beforeinput, input, keyup).
+  // Cada resultado fica em typedRescue (vai no diagnóstico, sem o texto) e a 1ª vez que um jeito funcionar entra no log.
+  let lastTyped = [];
+  const typedRescue = { tried: 0, ok: '', fail: '', next: '' };
+  let rescueLogged = '';
+  const rescueTyped = async () => {
+    typedRescue.tried = 0; typedRescue.ok = ''; typedRescue.fail = ''; typedRescue.next = ''; // estado deste exercício
+    await sleep(200); // o React pode devolver o campo vazio um instante depois: confere só depois disso
+    // precisa de resgate: campo vazio, ou com texto mas o Verificar desligado (o site não ficou com o texto)
+    const nextOff = !!$(S.next) && !isEnabled($(S.next));
+    const pending = lastTyped.filter((t) => t.el?.isConnected && t.v.trim() && (!fieldValue(t.el).trim() || nextOff));
+    if (!pending.length) { lastTyped = []; return true; }
+    const setV = (el, x) => { if (el.isContentEditable) el.textContent = x; else Object.getOwnPropertyDescriptor(el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype, 'value').set.call(el, x); };
+    const focused = (el) => document.activeElement === el || (el.isContentEditable && el.contains(document.activeElement));
+    // teclas simuladas não sobem para os atalhos do site (ex.: 1-5 escolhem opções)
+    const stopKey = (e) => e.stopPropagation();
+    const ways = {
+      exec: (el, v) => {
+        el.focus();
+        if (!focused(el)) return false; // sem o foco no campo, o texto cairia onde estiver a seleção
+        try { el.select?.(); } catch { /* editável */ }
+        if (el.isContentEditable) { const r = document.createRange(); r.selectNodeContents(el); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+        return document.execCommand('insertText', false, v) === true;
+      },
+      props: (el, v) => {
+        const p = propsOf(el);
+        if (!p?.onChange && !p?.onInput) return false;
+        setV(el, v);
+        const ev = { target: el, currentTarget: el, type: 'change', bubbles: true, nativeEvent: new InputEvent('input', { data: v, inputType: 'insertText', bubbles: true }),
+          preventDefault() {}, stopPropagation() {}, persist() {}, isDefaultPrevented: () => false, isPropagationStopped: () => false };
+        for (const h of [p.onChange, p.onInput]) if (typeof h === 'function') Promise.resolve(h(ev)).catch(() => {});
+        return true;
+      },
+      keys: (el, v) => {
+        el.focus();
+        el.addEventListener('keydown', stopKey); el.addEventListener('keyup', stopKey);
+        try {
+          setV(el, '');
+          let acc = '';
+          for (const ch of v) {
+            el.dispatchEvent(new KeyboardEvent('keydown', { key: ch, bubbles: true, cancelable: true }));
+            el.dispatchEvent(new InputEvent('beforeinput', { data: ch, inputType: 'insertText', bubbles: true, cancelable: true }));
+            acc += ch; setV(el, acc);
+            el.dispatchEvent(new InputEvent('input', { data: ch, inputType: 'insertText', bubbles: true }));
+            el.dispatchEvent(new KeyboardEvent('keyup', { key: ch, bubbles: true }));
+          }
+        } finally { el.removeEventListener('keydown', stopKey); el.removeEventListener('keyup', stopKey); }
+        return true;
+      },
+    };
+    // pegou = o texto continua no campo depois de 150 ms E de mais 300 ms (não só "apareceu e sumiu")
+    const held = async (el) => { await sleep(150); if (!fieldValue(el).trim()) return false; await sleep(300); return !!fieldValue(el).trim(); };
+    let allOk = true;
+    const failed = [];
+    for (const t of pending) {
+      let won = '';
+      for (const name of ['exec', 'props', 'keys']) {
+        typedRescue.tried++;
+        let ran = false;
+        try { ran = ways[name](t.el, t.v) !== false; } catch { ran = false; }
+        if (!ran) { failed.push(name); continue; }
+        if (await held(t.el)) { won = name; break; }
+        failed.push(name);
+      }
+      if (won) {
+        typedRescue.ok = won;
+        typedRescue.next = isEnabled($(S.next)) ? 'on' : 'off';
+        const key = won + '|' + typedRescue.next;
+        if (rescueLogged !== key) { rescueLogged = key; report(T('log.typedRescue', { way: won, next: T(typedRescue.next === 'on' ? 'scr.yes' : 'scr.no') })); }
+      } else allOk = false;
+    }
+    typedRescue.fail = [...new Set(failed)].join(',');
+    lastTyped = [];
+    return allOk;
   };
 
   // v0.19.7: preenche e confere. Campo que ficou vazio depois de digitar = a resposta das lacunas não
@@ -607,14 +691,16 @@
         v: inRoot.filter((i) => String(i.value ?? i.textContent ?? '').trim()).length,
         best: ch?.challengeResponseTrackingProperties?.best_solution ? 1 : 0,
         tr: root && $(S.translateInput, root) ? 1 : 0, next: isEnabled($(S.next)) ? 1 : 0,
-      }) + ' · ' + T('log.diagField', { k: inRoot.slice(0, 8).map(fieldKind).join(', ') || '-' }); // v0.19.13: formato do campo, sem valor
+      }) + ' · ' + T('log.diagField', { k: inRoot.slice(0, 8).map(fieldKind).join(', ') || '-' }) +
+        ' · ' + T('log.diagRescue', { n: typedRescue.tried, ok: (typedRescue.ok || '-') + (typedRescue.next ? '/' + typedRescue.next : ''), fail: typedRescue.fail || '-' }); // v0.19.13: formato do campo, sem valor
     } catch (e) { return 'diag: ' + (e?.message || e); }
   };
   // v0.19.13: formato de cada campo (tag, type, editável, data-test sem palavras), nunca o valor
   const fieldKind = (i) => {
     const dt = String(i.getAttribute('data-test') || '');
     const dts = /token/i.test(dt) ? '*-token' : /^[a-z0-9_ -]{1,40}$/.test(dt) ? dt : dt ? '(?)' : '';
-    return `${i.tagName.toLowerCase()}${i.isContentEditable ? '[editable]' : ''}${i.getAttribute('type') ? `[type=${String(i.getAttribute('type')).slice(0, 12)}]` : i.tagName === 'INPUT' ? '[no type]' : ''}${dts ? `[${dts}]` : ''}`;
+    const on = Object.keys(propsOf(i) || {}).filter((k) => /^on[A-Z]/.test(k)).slice(0, 6).join('/'); // só os nomes dos eventos que o campo escuta
+    return `${on ? `{${on}}` : ''}${i.tagName.toLowerCase()}${i.isContentEditable ? '[editable]' : ''}${i.getAttribute('type') ? `[type=${String(i.getAttribute('type')).slice(0, 12)}]` : i.tagName === 'INPUT' ? '[no type]' : ''}${dts ? `[${dts}]` : ''}`;
   };
 
   // ───────────────────────── solvers ─────────────────────────
@@ -723,7 +809,7 @@
     completeReverseTranslation: async ({ ch }) => {
       const best = ch.challengeResponseTrackingProperties?.best_solution;
       const input = $(S.translateInput, challengeRoot() || document);
-      if (input && best) return typeInto(input, best);
+      if (input && best) { const r = typeInto(input, best); lastTyped = [{ el: input, v: String(best) }]; return r; }
       return fillTyped(ch);
     },
     listenComplete: ({ ch }) => fillTyped(ch),
@@ -834,7 +920,9 @@
         emit('unknownType', { type: c.ch.type, keys: Object.keys(c.ch) });
         report(T('log.newType', { type: c.ch.type }), 'warn');
       }
+      lastTyped = [];
       await (fn || genericSolver)(c);
+      if (lastTyped.length) await rescueTyped(); // v0.19.15: campo que voltou vazio
       return true;
     } catch (e) {
       report(T('log.solverError', { e: e?.message || e }), 'error');
@@ -1823,7 +1911,7 @@
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
     outageState: () => outage, waitOutage, sendFail, settled, rateShift, siteErrorPage, reloadBlocked, // v0.19.9 (testes)
-    fillInputs, challengeRoot, diagTyped, screenDiag, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
+    fillInputs, challengeRoot, diagTyped, screenDiag, rescueTyped, typedRescue, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────

@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.15': [
+      "Ejercicios de completar la traducción escribiendo: cuando el campo no se queda con el texto, Midas prueba otras formas de escribir (incluida la forma en que el navegador escribe de verdad) antes de saltar el ejercicio, y el registro dice cuál funcionó.",
+    ],
     '0.19.14': [
       "\"Siguiente\" en el panel y en el popup muestra la sección y la unidad como las muestra Duolingo (\"sección 4, unidad 49\").",
       "Con dos pestañas de Duolingo abiertas no se pierde ninguna línea del registro, y una pestaña abierta después ya no le quita el grind a la pestaña de atrás.",
@@ -10,7 +13,7 @@
       "\"Copiar\" del registro ya no incluye el número de la cuenta.",
     ],
     '0.19.13': [
-      "Los ejercicios de completar la traducción escribiendo (\"Completa la traducción\") vuelven a responderse. El campo del hueco cambió de formato en Duolingo y Midas no lo encontraba: el ejercicio se saltaba.",
+      "Ejercicios de completar la traducción escribiendo (\"Completa la traducción\"): Midas también encuentra el campo del hueco en sus formatos nuevos (campo sin tipo, campo editable).",
     ],
     '0.19.12': [
       "Cuando una lección o historia no se abre, el registro dice qué pantalla estaba abierta (dirección, si la pestaña estaba oculta y los elementos de la pantalla, sin las palabras de la respuesta). Ayuda a encontrar qué cambió en Duolingo.",
