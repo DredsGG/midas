@@ -59,7 +59,7 @@ const render = (st) => {
     $('s-eta').textContent = st.alp_running === 'grind' && p.at ? fmtLive(p.etaMs - (Date.now() - p.at)) : fmtDur(p.etaMs);
     lastEta = { p, running: st.alp_running };
     $('current').textContent = p.current
-      ? `${T(p.current.mode === 'normal' ? 'mode.lesson' : 'mode.legendary')}: ${T('now.where', { u: p.current.u + 1, n: p.current.li + 1 })} · ${typeName(p.current.type)} · ${p.current.name}`
+      ? `${T(p.current.mode === 'normal' ? 'mode.lesson' : 'mode.legendary')}: ${p.current.s > 0 && p.current.su > 0 ? T('now.whereSec', { s: p.current.s, u: p.current.su, n: p.current.li + 1 }) : T('now.where', { u: p.current.u + 1, n: p.current.li + 1 })} · ${typeName(p.current.type)} · ${p.current.name}`
       : T('pop.complete');
   }
   const log = (st.alp_log || []).slice(-150)
@@ -178,6 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try { $('ver').textContent = '· v' + chrome.runtime.getManifest().version; } catch { /* ok */ }
   const { alp_cfg } = await chrome.storage.local.get('alp_cfg');
   const cfg = { ...DEFAULTS, ...(alp_cfg || {}) };
+  if (!alp_cfg?.preset) cfg.preset = presetOf({ ...cfg, preset: null }); // v0.19.10: config antiga sem preset
   $('delay').value = cfg.delay;
   $('delay-out').textContent = cfg.delay;
   $('humanize').checked = cfg.humanize;
@@ -214,7 +215,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('copy').addEventListener('click', async (e) => {
     e.preventDefault(); e.stopPropagation();
     const { alp_log = [] } = await chrome.storage.local.get('alp_log');
-    const text = alp_log.map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`).join('\n');
+    const text = alp_log.map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${String(l.msg).replace(/\/users\/\d+/g, '/users/…').replace(/\?fields=\S+/g, '')}`).join('\n'); // v0.19.14: sem o número da conta
     try { await navigator.clipboard.writeText(text); $('copy').textContent = T('log.copied'); } catch { $('copy').textContent = T('log.failed'); }
     setTimeout(() => ($('copy').textContent = T('log.copy')), 1500);
   });
@@ -237,7 +238,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       `Midas: v${chrome.runtime.getManifest().version} (${st.alp_update?.installType || '?'}) · popup`,
       `Browser: Chrome ${chromeV} · ${os} · UI ${I18N.lang} · ${navigator.language}`,
       `Grind: ${st.alp_running || 'stopped'} · ${cfg.preset} ${cfg.delay} ms${cfg.humanize ? ' · humanized' : ''}`,
-      c ? `Now: unit ${c.u + 1}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
+      c ? `Now: ${c.s > 0 && c.su > 0 ? `section ${c.s}, unit ${c.su}` : `unit ${c.u + 1}`}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
       p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
       unk.length ? `New types: ${unk.join(', ')}` : '',
       // v0.19.9: queda do Duolingo ativa e há quanto tempo (sem resposta nem dados da conta)

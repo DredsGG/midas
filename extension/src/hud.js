@@ -21,6 +21,7 @@
     ui: { open: true, logOpen: false, x: null, y: null, ...loadUi() },
     upd: {}, updStatus: null, // alp_update (do service worker) + estado do último clique
     seen: null, seenLoaded: false, // v0.15.0: alp_seen (tutorial e novidades já vistos)
+    blocked: null, // v0.19.11: diagnóstico do grind travado (linha de status)
     outage: null, // v0.19.9: queda do Duolingo (alp_outage), vinda do service worker pela ponte
   };
   const OB = () => window[Symbol.for('alp.onboard')];
@@ -638,7 +639,7 @@
     $('[data-a="copy"]').addEventListener('click', async (e) => {
       e.preventDefault(); e.stopPropagation(); // não abre/fecha o <details>
       const b = e.currentTarget; // currentTarget vira null depois do await
-      const text = state.logs.map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${l.msg}`).join('\n');
+      const text = state.logs.map((l) => `${new Date(l.t).toLocaleTimeString(I18N.locale)} ${l.level === 'info' ? '' : l.level.toUpperCase() + ' '}${scrub(l.msg)}`).join('\n'); // v0.19.14: sem o número da conta
       let ok = false;
       try { await navigator.clipboard.writeText(text); ok = true; } catch {
         const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
@@ -742,19 +743,18 @@
       paintEta();
       const note = $('.note');
       const bits = [];
-      if (p.blocked) bits.push(T('note.blocked', { n: nf(p.blocked) }));
       if (p.skipped) bits.push(T('note.skipped', { n: nf(p.skipped) }));
       if (p.paceHour) bits.push(T('note.pace', { n: nf(p.paceHour), m: p.paceWin }));
       note.textContent = bits.join(' · ');
       note.hidden = !bits.length;
       const c = p.current;
       $('.now').innerHTML = c
-        ? `${r === 'grind' ? '' : esc(T('now.next')) + ' '}<b>${esc(T(c.mode === 'normal' ? 'mode.lesson' : 'mode.legendary'))}</b> · ${esc(T('now.where', { u: c.u + 1, n: c.li + 1 }))} · ${esc(typeName(c.type))} · ${esc(c.name || '')}`
+        ? `${r === 'grind' ? '' : esc(T('now.next')) + ' '}<b>${esc(T(c.mode === 'normal' ? 'mode.lesson' : 'mode.legendary'))}</b> · ${esc(c.s > 0 && c.su > 0 ? T('now.whereSec', { s: c.s, u: c.su, n: c.li + 1 }) : T('now.where', { u: c.u + 1, n: c.li + 1 }))} · ${esc(typeName(c.type))} · ${esc(c.name || '')}`
         : esc(T(r === 'grind' ? 'now.reading' : 'now.none'));
     }
     // v0.19.9: uma linha de status enquanto o Duolingo estiver fora do ar (ou sem internet)
     const ou = $('.outage');
-    ou.textContent = state.outage ? I18N.outText?.(state.outage) || '' : '';
+    ou.textContent = state.outage ? I18N.outText?.(state.outage) || '' : state.blocked ? T('hud.blocked', state.blocked) : '';
     ou.hidden = !ou.textContent;
     const cfg = API()?.cfg;
     if (cfg) {
@@ -795,7 +795,7 @@
       `Midas: v${state.version || '?'} (${state.upd?.installType || '?'})`,
       `Browser: Chrome ${chrome} · ${os} · UI ${I18N.lang} · ${navigator.language}`,
       `Grind: ${state.running || 'stopped'} · ${cfg.preset || '?'} ${cfg.delay ?? '?'} ms${cfg.humanize ? ' · humanized' : ''}`,
-      c ? `Now: unit ${c.u + 1}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
+      c ? `Now: ${c.s > 0 && c.su > 0 ? `section ${c.s}, unit ${c.su}` : `unit ${c.u + 1}`}, node ${c.li + 1} · ${c.type} · ${c.name || ''} · ${c.mode}` : '',
       p ? `Path: ${p.eligibleDone ?? '?'}/${p.eligibleTotal ?? '?'} legendary · skipped ${p.skipped || 0}` : '',
       `Page: ${location.pathname} · status ${st} · challenge ${ch}`,
       state.unknown.size ? `New types: ${[...state.unknown].join(', ')}` : '',
@@ -864,7 +864,7 @@
   document.addEventListener('alp:out', (e) => {
     const { type, data } = e.detail || {};
     switch (type) {
-      case 'state': state.running = data?.running ?? null; break;
+      case 'state': state.running = data?.running ?? null; if (!state.running && data?.manual !== false) state.blocked = null; break;
       case 'progress': state.progress = data; break;
       case 'log': state.logs.push(data); if (state.logs.length > 500) state.logs.shift(); break;
       case 'unknownType': state.unknown.add(data.type); break;
@@ -873,9 +873,13 @@
         if (data?.progress && !state.progress) state.progress = data.progress;
         if (Array.isArray(data?.log) && !state.logs.length) state.logs = data.log.slice(-500);
         for (const k of Object.keys(data?.unknown || {})) state.unknown.add(k);
+        // v0.19.11: a linha de travado volta depois da recarga (o diagnóstico mais recente, da última 1 h)
+        { const last = Array.isArray(data?.restarts) ? data.restarts[data.restarts.length - 1] : null; if (last?.cause === 'blockedDiag' && Date.now() - (last.at || 0) < 3600e3) state.blocked = { n: last.n, node: last.node }; }
         if (data && 'seen' in data) { state.seen = data.seen || null; state.seenLoaded = true; setTimeout(() => maybeOnboard(), 400); }
         break;
       case 'outage': state.outage = data || null; break; // v0.19.9
+      case 'blockedDiag': state.blocked = data || null; break; // v0.19.11: grind travado, com o porquê
+      case 'grindStep': if (data?.upgraded) state.blocked = null; else return; break;
       case 'config': break; // render relê API().cfg
       case 'theme': setTheme(data); return;
       case 'stale': state.stale = true; break;

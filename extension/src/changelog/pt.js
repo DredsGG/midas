@@ -4,6 +4,29 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.14': [
+      "O \"Próximo\" no painel e no popup mostra a seção e a unidade como o Duolingo mostra (\"seção 4, unidade 49\").",
+      "Com duas abas do Duolingo abertas, nenhuma linha do log se perde, e uma aba aberta depois não toma mais o grind da aba de trás.",
+      "O Midas não clica mais em botões de outra extensão (como o painel do Duolingo PRO) e não fica preso numa leitura do Duolingo que não responde: desiste em 30 s e tenta de novo.",
+      "\"Copiar\" do log não leva mais o número da conta.",
+    ],
+    '0.19.13': [
+      "Exercícios de completar a tradução digitando (\"Complete a tradução\") voltam a ser respondidos. O campo da lacuna mudou de formato no Duolingo e o Midas não o achava: o exercício era pulado.",
+    ],
+    '0.19.12': [
+      "Quando uma lição ou história não abre, o log diz qual tela estava aberta (endereço, se a aba estava escondida e os elementos da tela, sem as palavras da resposta). Ajuda a achar sozinho o que mudou no Duolingo.",
+    ],
+    '0.19.11': [
+      "Quando a página mostra um nó ativo diferente do que o caminho lido pelo Midas aponta, o grind abre o da página. Antes ele tentava o outro pelo endereço direto, o Duolingo dava erro 500 e o grind ficava horas em \"travado, esperando, recarregando\".",
+      "Trocar de curso zera os nós pulados e o contador de travado do curso anterior.",
+      "Se o grind travar 3 vezes seguidas sem avançar, o log e o painel dizem qual nó não abre e por quê.",
+    ],
+    '0.19.10': [
+      'Trocar o preset de velocidade (Rage, Legit ou Manual) no popup ou no painel de outra aba agora vale na hora para a aba que roda o grind. Antes ela podia seguir no preset antigo por até 1 hora, até a próxima recarga.',
+      'O Parar do popup agora para o grind mesmo quando outra aba do Duolingo está na frente.',
+      'Configuração antiga, sem preset salvo, mostra no painel e no popup o preset que está valendo de verdade.',
+      'O quadro "Nova versão" não pisca mais a cada 5 s enquanto está aberto.',
+    ],
     '0.19.9': [
       'Quando o Duolingo cai (erro do servidor) ou a internet some, o Midas espera e confere de novo com intervalo crescente, em vez de recarregar a página em série, pular nó ou abandonar a lição; quando o site volta, ele retoma sozinho.',
       'A queda não entra na estimativa de tempo como ritmo ruim.',

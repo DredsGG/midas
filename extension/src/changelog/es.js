@@ -3,6 +3,29 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.14': [
+      "\"Siguiente\" en el panel y en el popup muestra la sección y la unidad como las muestra Duolingo (\"sección 4, unidad 49\").",
+      "Con dos pestañas de Duolingo abiertas no se pierde ninguna línea del registro, y una pestaña abierta después ya no le quita el grind a la pestaña de atrás.",
+      "Midas ya no pulsa botones de otras extensiones (como el panel de Duolingo PRO) y no se queda colgado en una lectura de Duolingo que no responde: se rinde a los 30 s y vuelve a intentar.",
+      "\"Copiar\" del registro ya no incluye el número de la cuenta.",
+    ],
+    '0.19.13': [
+      "Los ejercicios de completar la traducción escribiendo (\"Completa la traducción\") vuelven a responderse. El campo del hueco cambió de formato en Duolingo y Midas no lo encontraba: el ejercicio se saltaba.",
+    ],
+    '0.19.12': [
+      "Cuando una lección o historia no se abre, el registro dice qué pantalla estaba abierta (dirección, si la pestaña estaba oculta y los elementos de la pantalla, sin las palabras de la respuesta). Ayuda a encontrar qué cambió en Duolingo.",
+    ],
+    '0.19.11': [
+      "Cuando la página muestra un nodo activo distinto del que indica el camino que leyó Midas, el grind abre el de la página. Antes intentaba el otro por su dirección directa, Duolingo respondía con error 500 y el grind pasaba horas en \"atascado, esperando, recargando\".",
+      "Cambiar de curso reinicia los nodos saltados y el contador de atascado del curso anterior.",
+      "Si el grind se atasca 3 veces seguidas sin avanzar, el registro y el panel dicen qué nodo no se abre y por qué.",
+    ],
+    '0.19.10': [
+      'Cambiar el preset de velocidad (Rage, Legit o Manual) en el popup o en el panel de otra pestaña ahora vale al instante para la pestaña que corre el grind. Antes podía seguir con el preset anterior hasta 1 hora, hasta la próxima recarga.',
+      'Detener en el popup ahora detiene el grind aunque otra pestaña de Duolingo esté delante.',
+      'Una configuración antigua, sin preset guardado, muestra en el panel y en el popup el preset que de verdad se usa.',
+      'El cuadro "Nueva versión" ya no parpadea cada 5 s mientras está abierto.',
+    ],
     '0.19.9': [
       'Cuando Duolingo se cae (error del servidor) o se va el internet, Midas espera y vuelve a comprobar con intervalos crecientes, en vez de recargar la página en serie, saltar nodos o abandonar la lección; cuando el sitio vuelve, retoma solo.',
       'La caída no cuenta como ritmo lento en la estimación de tiempo.',

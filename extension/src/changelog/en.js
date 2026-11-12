@@ -3,6 +3,29 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.14': [
+      "\"Next\" in the panel and popup shows the section and unit the way Duolingo shows them (\"section 4, unit 49\").",
+      "With two Duolingo tabs open, no log line is lost, and a tab opened later no longer takes over the grind from the background tab.",
+      "Midas no longer clicks buttons from other extensions (like the Duolingo PRO panel) and no longer hangs on a Duolingo request that never answers: it gives up after 30 s and tries again.",
+      "\"Copy\" in the log no longer includes the account number.",
+    ],
+    '0.19.13': [
+      "Typing exercises that complete a translation (\"Complete the translation\") are answered again. The blank field changed format on Duolingo and Midas could not find it: the exercise was skipped.",
+    ],
+    '0.19.12': [
+      "When a lesson or story does not open, the log says which screen was open (address, whether the tab was hidden and the elements on screen, without the answer words). It helps find what changed on Duolingo.",
+    ],
+    '0.19.11': [
+      "When the page shows an active node different from the one in the path Midas read, the grind opens the one on the page. Before, it tried the other one by its direct address, Duolingo answered with error 500 and the grind spent hours in \"blocked, waiting, reloading\".",
+      "Switching course resets the skipped nodes and the blocked counter from the previous course.",
+      "If the grind gets blocked 3 times in a row without progress, the log and the panel say which node does not open and why.",
+    ],
+    '0.19.10': [
+      'Changing the speed preset (Rage, Legit or Manual) in the popup or in the panel of another tab now applies right away to the tab running the grind. Before, it could keep the old preset for up to 1 hour, until the next reload.',
+      'Stop in the popup now stops the grind even when another Duolingo tab is in front.',
+      'Old settings without a saved preset now show in the panel and popup the preset that is really in use.',
+      'The "New version" box no longer flickers every 5 s while it is open.',
+    ],
     '0.19.9': [
       'When Duolingo goes down (server error) or your internet drops, Midas waits and checks again at growing intervals instead of reloading the page over and over, skipping nodes or dropping the lesson; when the site is back, it resumes by itself.',
       'The outage does not count against the time estimate as a slow pace.',

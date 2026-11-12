@@ -490,8 +490,19 @@
     const vis = all.filter(isVisible);
     return vis[vis.length - 1] || all[all.length - 1] || null;
   };
+  // v0.19.13: o campo da lacuna do completeReverseTranslation pode vir sem "type" (input sem atributo = texto) ou como
+  // span editável. O seletor antigo (input[type="text"] e os dois data-test) não achava o campo dentro do exercício,
+  // caía nos campos da página (busca etc.), não digitava em nenhum e o exercício era pulado ("preenchidos 0").
+  // O seletor largo vale só DENTRO do exercício; na busca pela página inteira (sem campo no exercício) fica o antigo,
+  // para não digitar num campo alheio (busca do site, editável de outro widget).
+  const FIELD_SEL = `input:not([type]), input[type=""], input[type="text"], input[type="search"], ${S.textInput}, ${S.translateInput}, textarea, [contenteditable="true"], [contenteditable=""]`;
+  const PAGE_FIELD_SEL = `input[type="text"], ${S.textInput}, ${S.translateInput}, textarea`;
+  const fieldValue = (i) => String((i.isContentEditable ? i.textContent : i.value) ?? '');
   const answerFields = (root) => {
-    const all = $$(`input[type="text"], ${S.textInput}, ${S.translateInput}, textarea`, root || document).filter((i) => !i.disabled && !i.readOnly);
+    const all = $$(root ? FIELD_SEL : PAGE_FIELD_SEL, root || document)
+      .filter((i) => !i.disabled && !i.readOnly && !i.closest('[class*="DLP_"]'))
+      // editável que tem um campo nativo dentro: vale o de dentro (digitar no textContent do de fora apagaria o input)
+      .filter((i, _, arr) => !(i.isContentEditable && arr.some((o) => o !== i && i.contains(o))));
     const vis = root ? all.filter(isVisible) : all;
     return vis.length ? vis : all; // campo "invisível" ao checkVisibility mas ativo: usa assim mesmo
   };
@@ -520,7 +531,7 @@
   const typedFieldsEmpty = () => {
     const root = challengeRoot();
     const f = root ? answerFields(root) : [];
-    return f.length > 0 && f.some((i) => !String(i.value ?? '').trim());
+    return f.length > 0 && f.some((i) => !fieldValue(i).trim());
   };
   const fillTyped = (ch) => {
     const ok = fillInputs(typedAnswers(ch));
@@ -549,13 +560,44 @@
   };
 
   // v0.19.6: diagnóstico curto de exercício de digitar que travou (sem texto da resposta)
+  // v0.19.12: que tela estava aberta quando a lição/história não abriu (resultado no-session). Só o endereço, se a aba
+  // estava visível e os data-test visíveis, sem texto. O data-test dos tokens leva a palavra ("<palavra>-challenge-tap-token"):
+  // a palavra vira * para nunca ir resposta para o log.
+  const screenDiag = () => {
+    const vis = (e) => { try { return !!(e.offsetParent || e.getClientRects().length); } catch { return false; } };
+    // token com frase ("거야-challenge-tap-token 말하는") ou qualquer valor fora do padrão simples em ASCII não entra cru
+    const mask = (d) => {
+      const v = String(d || '').replace(/\s+/g, ' ').trim();
+      if (/token/i.test(v)) return '*-token';
+      if (!/^[a-z0-9_ -]{1,60}$/.test(v)) return '(?)';
+      return v.replace(/\b\d+\b/g, '#'); // números (unidade, nó, ids) não ajudam e podem ser ids
+    };
+    const dts = [...new Set($$('[data-test]').filter(vis).map((e) => mask(e.getAttribute('data-test'))))]
+      .filter((d) => !/(^|-)(nav|menu|stat|tab)$|^footer|^home$/.test(d)).slice(0, 25);
+    // endereço: só o 1º trecho conhecido (nada de /profile/<nome>), números viram #, o resto vira *
+    const seg = location.pathname.split('/').filter(Boolean);
+    const KNOWN = /^(learn|lesson|stories|story|practice|practice-hub|sections|legendary|lexeme-practice|alphabets|characters|unit|level|leaderboard|quests|shop)$/;
+    const path = seg.length && KNOWN.test(seg[0]) ? '/' + seg.map((x) => (KNOWN.test(x) ? x : /^\d+$/.test(x) ? '#' : '*')).join('/') : '/*';
+    return { path, vis: document.visibilityState === 'hidden' ? T('scr.hidden') : T('scr.visible'), dts: dts.join(', ') || '-' };
+  };
+  // uma linha por nó e por tela (no laço de "travado" o mesmo resultado se repetia a cada tentativa)
+  let lastScreenDiag = '';
+  const logScreenDiag = (lv) => {
+    try {
+      const d = screenDiag();
+      const key = `${lv?.id || ''}|${d.path}|${d.dts}`;
+      if (key === lastScreenDiag) return;
+      lastScreenDiag = key;
+      report(T('log.screenDiag', d), 'warn');
+    } catch { /* diagnóstico nunca derruba o grind */ }
+  };
   const diagTyped = () => {
     try {
       const { ch } = getChallenge() || {};
       const roots = $$('[data-test^="challenge challenge-"]');
       const root = challengeRoot();
       const toks = ch?.displayTokens || [];
-      const inRoot = root ? $$('input, textarea, [contenteditable="true"]', root) : [];
+      const inRoot = root ? $$('input, textarea, [contenteditable="true"], [contenteditable=""]', root) : [];
       const pageIn = $$('input[type="text"], textarea').length;
       return T('log.diagTyped', {
         type: ch?.type || '?', roots: roots.length, vis: roots.filter(isVisible).length,
@@ -565,8 +607,14 @@
         v: inRoot.filter((i) => String(i.value ?? i.textContent ?? '').trim()).length,
         best: ch?.challengeResponseTrackingProperties?.best_solution ? 1 : 0,
         tr: root && $(S.translateInput, root) ? 1 : 0, next: isEnabled($(S.next)) ? 1 : 0,
-      });
+      }) + ' · ' + T('log.diagField', { k: inRoot.slice(0, 8).map(fieldKind).join(', ') || '-' }); // v0.19.13: formato do campo, sem valor
     } catch (e) { return 'diag: ' + (e?.message || e); }
+  };
+  // v0.19.13: formato de cada campo (tag, type, editável, data-test sem palavras), nunca o valor
+  const fieldKind = (i) => {
+    const dt = String(i.getAttribute('data-test') || '');
+    const dts = /token/i.test(dt) ? '*-token' : /^[a-z0-9_ -]{1,40}$/.test(dt) ? dt : dt ? '(?)' : '';
+    return `${i.tagName.toLowerCase()}${i.isContentEditable ? '[editable]' : ''}${i.getAttribute('type') ? `[type=${String(i.getAttribute('type')).slice(0, 12)}]` : i.tagName === 'INPUT' ? '[no type]' : ''}${dts ? `[${dts}]` : ''}`;
   };
 
   // ───────────────────────── solvers ─────────────────────────
@@ -807,7 +855,8 @@
       if (isEnabled(el)) return el;
     }
     return $$('button, [role="button"]').find(
-      (b) => isEnabled(b) && !b.closest(S.quit) && CONTINUE_RE.test(norm(b.textContent))
+      // v0.19.14: nunca um botão de outra extensão (painel "DLP_" do Duolingo PRO tem "OK"/"Continue")
+      (b) => isEnabled(b) && !b.closest(S.quit) && !b.closest('[class*="DLP_"], [id*="DLP_"]') && CONTINUE_RE.test(norm(b.textContent))
     );
   };
   const pressNext = () => {
@@ -1046,19 +1095,29 @@
     try { return JSON.parse(atob(jwt().split('.')[1])).sub; } catch { return null; }
   };
   const shortPath = (p) => String(p).split('?')[0].replace(/\/users\/\d+/g, '/users/…');
+  // v0.19.14: leitura presa (o servidor não responde e não fecha) desiste em 30 s. Antes o laço do grind esperava até a
+  // vigia de 15 min. O relógio é o do worker (o da página é freado em aba de trás). Não conta como queda do Duolingo.
+  const API_TIMEOUT_MS = 30e3;
   const api = async (path, opts = {}) => {
+    const ac = typeof AbortController === 'function' ? new AbortController() : null;
+    let timedOut = false, settledReq = false;
+    if (ac && !opts.signal) sleep(API_TIMEOUT_MS).then(() => { if (!settledReq) { timedOut = true; ac.abort(); } });
+    const fail = () => new Error(`${opts.method || 'GET'} ${shortPath(path)} → timeout ${API_TIMEOUT_MS / 1000} s`);
     let res;
     try {
       res = await fetch(path, {
         credentials: 'include',
+        ...(ac && !opts.signal ? { signal: ac.signal } : {}),
         ...opts,
         headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/json', ...(opts.headers || {}) },
       });
-    } catch (e) { if (e?.name !== 'AbortError') e.net = true; throw e; } // v0.19.9: erro de rede (candidato a queda)
+    } catch (e) { settledReq = true; if (timedOut) throw fail(); if (e?.name !== 'AbortError') e.net = true; throw e; } // v0.19.9: erro de rede (candidato a queda)
     // v0.16.3: no log vai só o endereço curto, sem o número da conta e sem a consulta enorme
     // (a consulta inteira empurrava a HUD para os lados e o id da conta ia parar no "Relatar bug")
-    if (!res.ok) { const err = new Error(`${opts.method || 'GET'} ${shortPath(path)} → ${res.status}`); err.status = res.status; throw err; }
-    return res.json();
+    if (!res.ok) { settledReq = true; const err = new Error(`${opts.method || 'GET'} ${shortPath(path)} → ${res.status}`); err.status = res.status; throw err; }
+    try { return await res.json(); }
+    catch (e) { if (timedOut) throw fail(); throw e; }
+    finally { settledReq = true; }
   };
 
   const fetchPath = async () => {
@@ -1245,9 +1304,14 @@
   const startByRoute = async (lv) => {
     if (!lv || lv.type === 'chest') return false;
     report(T('log.routeStart'), 'warn');
+    lastTry.url = levelPath(lv);
     await go(levelPath(lv));
     return true;
   };
+  // v0.19.11: nó que a página mostrou como ativo e foi aberto no lugar do nó da API (ver startActiveNode)
+  let shownStart = null;
+  // v0.19.11: última tentativa do grind (para o diagnóstico do "travado"): nó, endereço, resultado, status
+  const lastTry = { lv: null, mode: null, url: null, r: null, code: 0 };
   const startActiveNode = async (wantId = null, lvWanted = null) => {
     await go('/learn');
     for (let i = 0; i < 20 && !$(S.path); i++) await sleep(300);
@@ -1298,6 +1362,23 @@
         await sleep(60000); // a ponte recarrega a página; se não recarregar, segue abaixo
       }
     }
+    // v0.19.11: a página (mesmo depois de recarregar) mostra OUTRO nó ativo que não o da API. Antes o grind abria o
+    // nó da API pelo endereço direto: com o nó fora do que a página libera, o Duolingo dava "Error 500"/sem lição,
+    // o nó era pulado, o grind ficava sem alvo e entrava no loop "travado → espera → recarrega" (relato de 12/11:
+    // API "unidade 118, Together", página "unidade 49"). Agora vale o nó que a página mostra (é o que o próprio
+    // Duolingo deixa abrir); a rota direta fica só para quando a página não desenha nenhum nó (aba em segundo plano).
+    if (!hit && wantId) {
+      const nodes = [...new Set([...$$('[data-test*="skill-path-level-"]'), ...$$(`${S.path} button`)])];
+      for (const n of nodes) {
+        const l = levelOf(n);
+        if (l?.state === 'active' && l.id && l.id !== wantId) { hit = { node: n, lv: l }; break; }
+      }
+      if (hit) {
+        shownStart = hit.lv;
+        lastTry.shown = hit.lv;
+        report(T('log.shownActive', { name: hit.lv.debugName || hit.lv.id, u: (lvWanted?.unitIndex ?? -1) + 1, n: (lvWanted?.levelInUnit ?? -1) + 1 }), 'warn');
+      }
+    }
     if (!hit) return startByRoute(lvWanted);
     const { node, lv: lvActive } = hit;
     node.scrollIntoView({ block: 'center' });
@@ -1333,7 +1414,6 @@
   // eram 0 douradas de 525 (2026-10-19). Fica fora da fila e é contada à parte.
   // v0.13.4: com o skillIds completado no pedido (fixSrBody) ela aceita Titã; nada mais fica bloqueado
   const isSpacedRep = (l) => l.type === 'practice' && /^spaced repetition/i.test(l.debugName || '');
-  const isBlockedByDuolingo = () => false;
   // ids da prática Spaced Repetition (pathLevelClientData), buscados uma vez e guardados por id do nó
   const srIds = new Map();
   const loadSrIds = async () => {
@@ -1348,8 +1428,29 @@
     if (!srIds.has(lv.id)) { try { await loadSrIds(); } catch { /* sem ids: o pedido sai como o site manda */ } }
     return srIds.get(lv.id) || null;
   };
-  const isEligible = (l) => LEGEND_TYPES.has(l.type) && !isBlockedByDuolingo(l);
+  const isEligible = (l) => LEGEND_TYPES.has(l.type);
   const grindState = { skip: {}, attempts: {}, done: 0, startedAt: 0 };
+  // v0.19.11: troca de curso. O que é do curso (pulados, tentativas, alp.blockedReloads, falas travadas, recarga
+  // por caminho velho) não passa para o curso novo: um alp.blockedReloads n=16 herdado já começava na espera de 30 min.
+  // alp.rate não precisa: o salto de passos (> 20) já zera o histórico do ritmo.
+  let lastCourse = null;
+  const COURSE_KEY = 'alp.course';
+  const courseCheck = (course) => {
+    if (!course?.id) return false;
+    lastCourse = course;
+    let prev = null;
+    try { prev = localStorage.getItem(COURSE_KEY); } catch { /* sem storage */ }
+    try { localStorage.setItem(COURSE_KEY, course.id); } catch { /* idem */ }
+    if (prev === course.id) return false;
+    try { for (const k of ['alp.blockedReloads', 'alp.speakReloads']) localStorage.removeItem(k); sessionStorage.removeItem('alp.staleReload'); } catch { /* idem */ }
+    // 1ª leitura desde a v0.19.11 (nenhum curso guardado ainda): não dá para saber se o contador é deste curso;
+    // zera os contadores uma vez, sem aviso e sem mexer nos pulados (o grind retomado mantém a lista)
+    if (!prev) return false;
+    grindState.skip = {}; grindState.attempts = {}; grindState.sess5xx = {};
+    report(T('log.courseChanged', { from: prev, to: course.learningLanguage || course.id }), 'warn');
+    emit('grindStep', { skip: {} });
+    return true;
+  };
 
   // Resumo que serve tanto para curso avançado quanto para curso zerado: "faltam"
   // conta tudo que ainda não está dourado entre os nós que aceitam Titãs (inclusive
@@ -1374,7 +1475,6 @@
       remaining: eligible.length - eligibleDone,
       steps,
       todo: eligible.filter((l) => l.state === 'passed' && !grindState.skip[l.id]).length,
-      blocked: levels.filter((l) => isBlockedByDuolingo(l)).length,
       skipped: Object.keys(grindState.skip).length,
     };
   };
@@ -1430,7 +1530,9 @@
       msPerNode: Math.round(per),
       etaMs: Math.round(per * sum.steps),
       paceHour: pc ? Math.round(pc.perHour) : null, paceWin: pc ? Math.round(pc.win / 60e3) : null,
-      current: target && { u: target.lv.unitIndex, li: target.lv.levelInUnit, type: target.lv.type, name: target.lv.debugName, mode: target.mode },
+      // v0.19.14: s/su = seção e unidade como o site mostra ("Seção 4, unidade 49": a unidade conta dentro da seção)
+      current: target && { u: target.lv.unitIndex, li: target.lv.levelInUnit, type: target.lv.type, name: target.lv.debugName, mode: target.mode,
+        s: (target.lv.sectionIndex ?? -1) + 1, su: target.lv.unitIndex - sectionRange(levels, target.lv.sectionIndex)[0] + 1 },
       skip: grindState.skip,
       at: Date.now(),
     };
@@ -1502,6 +1604,23 @@
       // passou de 6 h: volta ao comportamento de antes (espera de "travado" normal)
     }
     const secs = blockedWait();
+    // v0.19.11: da 3ª vez seguida sem avanço em diante, diz no log, na HUD e em alp_restarts POR QUE travou
+    // (nó, curso, endereço, resultado, status) em vez de só esperar calado. A espera em si não mudou.
+    let bn = 0;
+    try { bn = JSON.parse(localStorage.getItem(BLOCK_KEY) || '{}').n || 0; } catch { /* sem storage */ }
+    if (bn >= 3) {
+      const lv = lastTry.lv;
+      const d = {
+        n: bn, course: lastCourse?.learningLanguage || lastCourse?.id || '?',
+        node: (lv ? `${lv.unitIndex + 1}/${lv.levelInUnit + 1} ${lv.type} ${lv.debugName || ''}`.trim() : '?') +
+          (lastTry.shown ? ` (página: ${lastTry.shown.debugName || lastTry.shown.id})` : ''),
+        u: lv ? lv.unitIndex + 1 : '?', k: lv ? lv.levelInUnit + 1 : '?', name: lv?.debugName || '', type: lv?.type || '',
+        mode: lastTry.mode || '', url: String(lastTry.url || location.pathname).split('?')[0], r: String(lastTry.r || '-'),
+        code: lastTry.code || siteErrorPage() || lastSessionError?.status || 0, waitS: secs,
+      };
+      report(T('log.blockedDiag', d), 'error');
+      emit('blockedDiag', d);
+    }
     report(T('log.blockedReload', { s: secs }), 'warn');
     emit('waiting', { until: Date.now() + secs * 1000 });
     for (let i = 0; i < secs && !token.stop; i++) await sleep(1000);
@@ -1550,10 +1669,13 @@
         }
         report(T('log.pathFail', { e: e.message }), 'error'); await sleep(15000); continue;
       }
+      if (courseCheck(course)) { justPassedId = null; retry = null; } // v0.19.11: curso novo não herda pulados/tentativas
 
       const sum = summarize(levels);
       const target = pickTarget(levels, justPassedId, retry);
       justPassedId = null; retry = null;
+      shownStart = null; // nunca vaza de uma volta para a outra (ex.: startActiveNode devolveu false)
+      if (target) Object.assign(lastTry, { lv: target.lv, mode: target.mode, url: null, r: null, code: 0, shown: null });
       const per = grindState.done ? (Date.now() - grindState.startedAt) / grindState.done : 35e3;
       emit('progress', { ...progressPayload(levels, course, target, per, true), doneThisRun: grindState.done });
       if (!target) {
@@ -1570,6 +1692,7 @@
       report(T('log.target', { mode: T(mode === 'normal' ? 'mode.lesson' : 'mode.legendary').toLowerCase(), u: lv.unitIndex + 1, n: lv.levelInUnit + 1, type: lv.type, name: lv.debugName }));
       if (mode === 'normal') {
         await ensureSection(lv.sectionIndex, sectionRange(levels, lv.sectionIndex));
+        shownStart = null;
         started = await startActiveNode(lv.id, lv);
         if (!started) {
           const n = grindState.attempts[lv.id] = (grindState.attempts[lv.id] || 0) + 1;
@@ -1585,10 +1708,15 @@
           continue;
         }
         srOverride = isSpacedRep(lv) ? await srIdsFor(lv) : null;
+        lastTry.url = legendaryPath(lv);
         await go(legendaryPath(lv));
       }
+      const opened = shownStart; shownStart = null; // v0.19.11: nó da página aberto no lugar do da API
       const r = started === 'chest' ? 'chest' : await runSession(token);
       srOverride = null;
+      lastTry.r = r; lastTry.code = siteErrorPage() || (lastSessionError && lastSessionError.at >= Date.now() - 60e3 ? lastSessionError.status : 0);
+      if (!lastTry.url) lastTry.url = location.pathname;
+      if (r === 'no-session') logScreenDiag(opened || lv); // v0.19.12
       if (token.stop) break;
       // v0.19.9: POST /sessions com 5xx ou erro de rede (status 0). Queda declarada: espera e repete o MESMO nó, sem
       // pular e sem contar tentativa. Isolado: a 1ª vez tenta o mesmo nó de novo; a 2ª é o comportamento de sempre
@@ -1657,13 +1785,21 @@
       // nó com várias lições (ex.: 1/4): o estado só muda na última — conta também
       // o avanço de finishedSessions como progresso (senão o grind pularia o nó)
       const advanced = after && (after.finishedSessions ?? 0) > (lv.finishedSessions ?? 0);
-      const upgraded = after && (after.state !== lv.state || advanced);
+      // v0.19.11: abriu o nó que a página mostrava (não o da API) ou os dois não batem: vale como avanço se ESSE nó
+      // mudou, ou se o total de passos do curso caiu. Sem isto o nó da API era pulado mesmo com a lição feita.
+      let otherMoved = false;
+      if (cachedLevels && !(after && (after.state !== lv.state || advanced))) {
+        const o0 = opened && levels.find((l) => l.id === opened.id), o1 = opened && cachedLevels.find((l) => l.id === opened.id);
+        otherMoved = (!!o0 && !!o1 && (o1.state !== o0.state || (o1.finishedSessions ?? 0) > (o0.finishedSessions ?? 0))) ||
+          (!!opened && summarize(cachedLevels).steps < sum.steps);
+      }
+      const upgraded = (after && (after.state !== lv.state || advanced)) || otherMoved;
       if (upgraded) {
         grindState.done++;
         try { localStorage.removeItem(BLOCK_KEY); } catch { /* sem storage */ }
         grindState.attempts[lv.id] = 0;
         delete grindState.sess5xx[lv.id];
-        if (mode === 'normal') justPassedId = lv.id; // emenda a Titãs do mesmo nó
+        if (mode === 'normal') justPassedId = otherMoved && opened ? opened.id : lv.id; // emenda a Titãs do mesmo nó
       }
       else {
         if (String(r).startsWith('session-error')) {
@@ -1687,7 +1823,7 @@
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
     outageState: () => outage, waitOutage, sendFail, settled, rateShift, siteErrorPage, reloadBlocked, // v0.19.9 (testes)
-    fillInputs, challengeRoot, diagTyped, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
+    fillInputs, challengeRoot, diagTyped, screenDiag, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────
@@ -1815,6 +1951,7 @@
     try {
       const { levels, course } = await fetchPath();
       lastRefresh = Date.now();
+      courseCheck(course); // v0.19.11
       emit('progress', progressPayload(levels, course, pickTarget(levels, null), grindState.done ? (Date.now() - grindState.startedAt) / grindState.done : 0));
     } catch { /* sem login / rede: tenta depois */ }
     finally { refreshing = false; }

@@ -29,9 +29,16 @@
     try { return await fn(...a); } catch (err) { if (!alive()) goDead(); else throw err; }
   };
 
+  // v0.19.10: config salva antes da v0.8.0 não tem "preset"; sem isto o DEFAULTS punha 'rage' por cima
+  // e a HUD mostrava Rage com o atraso de outro preset
+  const withPreset = (c) => {
+    const m = { ...DEFAULTS, ...(c || {}) };
+    if (!c?.preset) m.preset = m.delay === 0 && !m.humanize ? 'rage' : m.delay === 2500 && m.humanize ? 'legit' : 'manual';
+    return m;
+  };
   const pushConfig = safe(async () => {
     const { alp_cfg } = await chrome.storage.local.get('alp_cfg');
-    send('config', { ...DEFAULTS, ...(alp_cfg || {}) });
+    send('config', withPreset(alp_cfg));
   });
 
   // idioma escolhido nas bandeirinhas (vale para HUD, popup e todas as abas)
@@ -45,6 +52,9 @@
     if (ch.alp_theme?.newValue) send('theme', ch.alp_theme.newValue);
     if (ch.alp_update?.newValue) { toHud('update', ch.alp_update.newValue); setUrgent(ch.alp_update.newValue); }
     if ('alp_outage' in ch || 'alp_outage_cap' in ch) pushOutage(); // v0.19.9: queda do Duolingo começou/avançou/acabou (vale para todas as abas)
+    // v0.19.10: preset/atraso mudado no popup ou na HUD de OUTRA aba chega a esta na hora. Antes só a aba ativa
+    // (popup) ou a própria aba (HUD) recebia; a aba do grind em segundo plano seguia no preset velho até recarregar.
+    if ('alp_cfg' in ch) pushConfig();
   });
 
   // v0.19.9: Duolingo fora do ar. O estado mora no service worker (alp_outage); aqui só leva para a página.
@@ -75,7 +85,9 @@
   let tabId = null;
   try { tabId = sessionStorage.getItem('alp.tab'); } catch { /* ok */ }
   if (!tabId) { tabId = Math.random().toString(36).slice(2); try { sessionStorage.setItem('alp.tab', tabId); } catch { /* ok */ } }
-  const LOCK_TTL = 30000;
+  // v0.19.14: 30 → 75 s. Com a aba do grind escondida há mais de 5 min o Chrome espaça o setInterval de 10 s para
+  // 1 por minuto; com 30 s, uma aba do Duolingo aberta nesse intervalo achava o lock velho e tomava o grind.
+  const LOCK_TTL = 75000;
   const otherTabRunning = async () => {
     const { alp_lock } = await chrome.storage.local.get('alp_lock');
     return !!alp_lock && alp_lock.id !== tabId && Date.now() - alp_lock.at < LOCK_TTL;
@@ -103,6 +115,11 @@
     if (beat && l && l.id !== tabId && (Date.now() - beatStart > 5000 || l.id < tabId)) {
       clearInterval(beat); beat = null; send('yield');
     }
+    // v0.19.10: "Parar" do popup chegou a outra aba do Duolingo (a ativa): esta, que roda o grind, para também.
+    // Antes o grind seguia rodando aqui com o grind salvo já desligado (parava só na recarga de 1 h).
+    const g = ch.alp_grind?.newValue;
+    // (a própria aba que recebeu o Parar já para pelo send('stop') do onMessage: stopBy evita o 2º 'parado')
+    if (beat && g && g.active === false && g.stopAt && g.stopBy !== tabId && g.stopAt !== ch.alp_grind.oldValue?.stopAt) send('stop');
   });
 
   // retoma o grind se a página recarregar no meio (crash, deploy do Duolingo, etc.) —
@@ -122,11 +139,24 @@
     if (alp_grind?.active) {
       setTimeout(safe(async () => {
         if (urgent) { send('note', 'updUrgent'); return; }
-        if (await otherTabRunning()) { send('note', 'otherTab'); return; }
+        if (await otherTabRunning()) { send('note', 'otherTab'); recheckResume(1); return; }
         send('grind', { skip: alp_grind.skip || {}, resume: true });
       }), 2500 + Math.floor(Math.random() * 1500));
     }
   });
+
+  // v0.19.14: a outra aba pode ter morrido (fechada, travou) logo antes desta abrir. Confere de novo quando o lock dela
+  // venceria (LOCK_TTL + 5 s), até 10 vezes; retoma só se o grind seguir ligado, sem versão urgente e sem outra aba viva.
+  const recheckResume = (n) => {
+    if (n > 10) return;
+    setTimeout(safe(async () => {
+      if (beat) return; // esta aba já assumiu (Iniciar, outra retomada)
+      const { alp_grind } = await chrome.storage.local.get('alp_grind');
+      if (!alp_grind?.active || urgent) return;
+      if (await otherTabRunning()) return recheckResume(n + 1);
+      send('grind', { skip: alp_grind.skip || {}, resume: true });
+    }), LOCK_TTL + 5000);
+  };
 
   // manda progresso/log salvos para a HUD (ela abre com os dados da última sessão)
   const hydrate = safe(async () => {
@@ -137,12 +167,17 @@
   // log circular + progresso → storage (o popup lê daqui)
   let logBuf = [];
   let flushT = null;
+  // v0.19.14: as linhas vão para o service worker, que grava em fila (duas abas lendo e gravando o alp_log ao mesmo
+  // tempo perdiam linhas). Sem resposta do service worker, grava direto como antes.
   const flush = safe(async () => {
     flushT = null;
+    const lines = logBuf; logBuf = [];
+    if (!lines.length) return;
+    const r = await chrome.runtime.sendMessage({ cmd: 'log', lines }).catch(() => null);
+    if (r?.ok) return;
     const { alp_log = [] } = await chrome.storage.local.get('alp_log');
-    const merged = alp_log.concat(logBuf).slice(-500);
-    logBuf = [];
-    await chrome.storage.local.set({ alp_log: merged });
+    const have = new Set(alp_log.slice(-lines.length - 50).map((l) => `${l.t}|${l.msg}`));
+    await chrome.storage.local.set({ alp_log: alp_log.concat(lines.filter((l) => !have.has(`${l.t}|${l.msg}`))).slice(-500) });
   });
 
   const onOut = safe(async (e) => {
@@ -270,6 +305,15 @@
         location.reload();
         break;
       }
+      case 'blockedDiag': {
+        // v0.19.11: diagnóstico do travado (3ª vez seguida sem avanço) vai para o histórico de reinícios (só nó, curso,
+        // endereço sem consulta, resultado e status: nada da conta)
+        const d = data || {};
+        const { alp_restarts = [] } = await chrome.storage.local.get('alp_restarts');
+        await chrome.storage.local.set({ alp_restarts: alp_restarts.concat({ at: Date.now(), cause: 'blockedDiag', ver: chrome.runtime.getManifest().version,
+          n: Number(d.n) || 0, node: String(d.node || ''), course: String(d.course || ''), url: String(d.url || '').split('?')[0], r: String(d.r || ''), code: Number(d.code) || 0 }).slice(-50) });
+        break;
+      }
       case 'unknownType': {
         const { alp_unknown = {} } = await chrome.storage.local.get('alp_unknown');
         alp_unknown[data.type] = { keys: data.keys, at: Date.now() };
@@ -288,7 +332,8 @@
         send('grind', {});
       } else if (msg?.cmd === 'stop') {
         const { alp_grind = {} } = await chrome.storage.local.get('alp_grind');
-        await chrome.storage.local.set({ alp_grind: { ...alp_grind, active: false } });
+        // v0.19.10: stopAt avisa a aba que roda o grind (o popup manda o Parar para a aba ATIVA, que pode ser outra)
+        await chrome.storage.local.set({ alp_grind: { ...alp_grind, active: false, stopAt: Date.now(), stopBy: tabId } });
         send('stop');
       } else if (msg?.cmd === 'config') {
         await pushConfig();

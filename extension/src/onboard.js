@@ -176,7 +176,15 @@
     get kind() { return cur?.kind || null; },
     get locked() { return !!cur?.opts?.locked; },
     // troca dados do quadro aberto (ex.: mensagem depois do Atualizar) e redesenha
-    set: (patch) => { if (cur) { cur.opts = { ...cur.opts, ...patch }; render(); } },
+    // v0.19.10: só redesenha se algum dado mudou. A HUD chama isto a cada 5 s com o quadro "Nova versão" aberto;
+    // redesenhar sempre recriava o cartão (a animação de entrada rodava de novo: o quadro piscava e perdia o foco)
+    set: (patch) => {
+      if (!cur) return;
+      const same = (a, b) => typeof a === 'function' || typeof b === 'function' || JSON.stringify(a) === JSON.stringify(b);
+      const changed = Object.keys(patch || {}).some((k) => !same(cur.opts[k], patch[k]));
+      cur.opts = { ...cur.opts, ...patch };
+      if (changed) render();
+    },
     refresh: render, // troca de idioma com o quadro aberto
   });
   Object.defineProperty(globalThis, KEY, { value: api });

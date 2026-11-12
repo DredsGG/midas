@@ -25,7 +25,6 @@ const hasSitePerm = async () => { try { return await chrome.permissions.contains
 const paint = async () => {
   const { alp_running } = await chrome.storage.local.get('alp_running');
   const perm = await hasSitePerm();
-  await chrome.storage.local.set({ alp_perm: perm });
   const text = !perm ? '!' : alp_running === 'grind' ? 'AUTO' : alp_running === 'lesson' ? 'ON' : '';
   await chrome.action.setBadgeText({ text });
   await chrome.action.setBadgeBackgroundColor({ color: !perm ? '#ff4b4b' : alp_running === 'grind' ? '#e0a800' : '#58cc02' });
@@ -374,6 +373,18 @@ const outageStep = () => outSerial(async () => {
   outAlarm(next);
 });
 
+// v0.19.14: log das abas em fila (uma gravação por vez; antes cada aba lia e gravava o alp_log e uma apagava a outra)
+let logQueue = Promise.resolve();
+const appendLog = (lines) => {
+  const p = logQueue.then(async () => {
+    if (!Array.isArray(lines) || !lines.length) return;
+    const { alp_log = [] } = await chrome.storage.local.get('alp_log');
+    await chrome.storage.local.set({ alp_log: alp_log.concat(lines.slice(-500)).slice(-500) });
+  });
+  logQueue = p.catch(() => {}); // a fila segue mesmo se uma gravação falhar; quem chamou recebe o erro (ok:false)
+  return p;
+};
+
 const schedule = () => {
   chrome.alarms.create('alp-update', { delayInMinutes: 1, periodInMinutes: CHECK_EVERY_MIN });
   chrome.alarms.create('alp-disk', { delayInMinutes: DISK_EVERY_MIN, periodInMinutes: DISK_EVERY_MIN });
@@ -391,6 +402,7 @@ chrome.alarms.onAlarm.addListener((a) => {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg?.cmd === 'beat') { onBeat(sender?.tab?.id); return false; }
   if (msg?.cmd === 'outageFail') { onOutageFail(msg).then(reply, () => reply({ outage: null })); return true; }
+  if (msg?.cmd === 'log') { appendLog(msg.lines).then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
   if (msg?.cmd === 'outageOk') { onOutageOk().then(reply, () => reply({ ok: false })); return true; }
   if (msg?.cmd === 'updCheck') { checkUpdate({ soft: !!msg.soft }).then(reply); return true; }
   if (msg?.cmd === 'openGuide') { chrome.tabs.create({ url: chrome.runtime.getURL('COMO-INSTALAR.html') + (msg.hash || '') }).then(() => reply({ ok: true })); return true; }
