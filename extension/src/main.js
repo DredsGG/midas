@@ -514,12 +514,12 @@
     if (!inputs.length && root !== document) inputs = answerFields(null).filter((i) => !i.closest('[class*="DLP_"]'));
     if (inputs.length && inputs.length === answers.length) {
       inputs.forEach((inp, i) => typeInto(inp, answers[i]));
-      lastTyped = inputs.map((el, i) => ({ el, v: String(answers[i] ?? '') }));
+      lastTyped = inputs.map((el, i) => ({ el, v: String(answers[i] ?? '') })); lastTypedFrom = 'fill';
       return true;
     }
     // fallback: cada input conhece seu token via fiber (fullText + damageStart)
     let ok = false;
-    lastTyped = [];
+    lastTyped = []; lastTypedFrom = ''; // pelo fiber: sem garantia de um campo por lacuna
     for (const inp of inputs) {
       const tok = walkUp(fiberOf(inp), (f) =>
         f.pendingProps?.fullText !== undefined ? f.pendingProps : undefined, 8);
@@ -537,6 +537,40 @@
   //   'keys' = tecla por tecla (keydown, beforeinput, input, keyup).
   // Cada resultado fica em typedRescue (vai no diagnóstico, sem o texto) e a 1ª vez que um jeito funcionar entra no log.
   let lastTyped = [];
+  let lastTypedFrom = ''; // v0.19.17: 'fill' = um campo por lacuna (fillInputs); 'translate' = frase inteira
+  // v0.19.17: o estado do exercício (props do componente do desafio, achado subindo da lacuna pelo React):
+  // { challenge: {type, displayTokens}, challengeState: {guess}, onChange }. No Duolingo (bundle de 12/11):
+  // completeReverseTranslation guarda guess = { translatedWords: [uma posição por token] } (prepareChallengeState);
+  // listenComplete guarda guess = [uma posição por token]. O Verificar liga quando toda lacuna tem texto.
+  const challengePropsOf = (el) => walkUp(fiberOf(el), (fb) => {
+    const p = fb.memoizedProps;
+    return p && p.challengeState && typeof p.onChange === 'function' && Array.isArray(p.challenge?.displayTokens) ? p : undefined;
+  }, 60);
+  const guessWords = (p) => { const g = p?.challengeState?.guess; return Array.isArray(g) ? g : Array.isArray(g?.translatedWords) ? g.translatedWords : null; };
+  // espera o Duolingo criar a lista de respostas (até 1,5 s). Digitar antes disso apaga a lista para sempre.
+  const waitGuessReady = async () => {
+    const root = challengeRoot();
+    const el = root && answerFields(root)[0];
+    if (!el || !challengePropsOf(el)) return;
+    for (let i = 0; i < 30 && !guessWords(challengePropsOf(el)); i++) await sleep(50);
+  };
+  // reconstrói a lista de respostas com o texto de cada lacuna (na ordem das lacunas) e entrega pelo onChange do exercício
+  const GUESS_TYPES = new Set(['completeReverseTranslation', 'listenComplete']);
+  const repairGuess = (el) => {
+    const p = challengePropsOf(el);
+    if (!p || !GUESS_TYPES.has(p.challenge.type) || lastTypedFrom !== 'fill') return false;
+    const toks = p.challenge.displayTokens;
+    const blanks = toks.reduce((a, t, i) => (t?.isBlank ? a.concat(i) : a), []);
+    const vals = lastTyped.map((t) => t.v);
+    if (!blanks.length || blanks.length !== vals.length) return false;
+    const prev = guessWords(p) || [];
+    const words = toks.map((_, i) => (prev[i] != null ? prev[i] : ''));
+    blanks.forEach((ti, k) => { words[ti] = vals[k]; });
+    const g = p.challengeState.guess;
+    const asArray = Array.isArray(g) || p.challenge.type === 'listenComplete';
+    p.onChange(asArray ? words : { ...(g && typeof g === 'object' ? g : {}), translatedWords: words });
+    return true;
+  };
   const typedRescue = { tried: 0, ok: '', fail: '', next: '' };
   let rescueLogged = '';
   const rescueTyped = async () => {
@@ -588,6 +622,19 @@
     const held = async (el) => { await sleep(150); if (!fieldValue(el).trim()) return false; await sleep(300); return !!fieldValue(el).trim(); };
     let allOk = true;
     const failed = [];
+    // 1º: reparar a lista de respostas do exercício (causa vista no código do Duolingo). Vale só se o Verificar ligar.
+    if (repairGuess(pending[0].el)) {
+      typedRescue.tried++;
+      for (let i = 0; i < 10 && !isEnabled($(S.next)); i++) await sleep(60);
+      if (isEnabled($(S.next)) && pending.every((t) => fieldValue(t.el).trim())) {
+        typedRescue.ok = 'state'; typedRescue.next = 'on';
+        if (rescueLogged !== 'state|on') { rescueLogged = 'state|on'; report(T('log.typedRescue', { way: 'state', next: T('scr.yes') })); }
+        typedRescue.fail = '';
+        lastTyped = [];
+        return true;
+      }
+      failed.push('state');
+    }
     for (const t of pending) {
       let won = '';
       for (const name of ['exec', 'props', 'keys']) {
@@ -692,6 +739,7 @@
         best: ch?.challengeResponseTrackingProperties?.best_solution ? 1 : 0,
         tr: root && $(S.translateInput, root) ? 1 : 0, next: isEnabled($(S.next)) ? 1 : 0,
       }) + ' · ' + T('log.diagField', { k: inRoot.slice(0, 8).map(fieldKind).join(', ') || '-' }) +
+        ' · ' + T('log.diagGuess', { g: (() => { const el = challengeRoot() && answerFields(challengeRoot())[0]; const p = el && challengePropsOf(el); return !p ? '-' : guessWords(p) ? T('scr.yes') : T('scr.no'); })() }) +
         ' · ' + T('log.diagRescue', { n: typedRescue.tried, ok: (typedRescue.ok || '-') + (typedRescue.next ? '/' + typedRescue.next : ''), fail: typedRescue.fail || '-' }); // v0.19.13: formato do campo, sem valor
     } catch (e) { return 'diag: ' + (e?.message || e); }
   };
@@ -807,12 +855,13 @@
     orderTapComplete: orderTapComplete,
     translate: translateLike,
     completeReverseTranslation: async ({ ch }) => {
+      await waitGuessReady(); // v0.19.17
       const best = ch.challengeResponseTrackingProperties?.best_solution;
       const input = $(S.translateInput, challengeRoot() || document);
-      if (input && best) { const r = typeInto(input, best); lastTyped = [{ el: input, v: String(best) }]; return r; }
+      if (input && best) { const r = typeInto(input, best); lastTyped = [{ el: input, v: String(best) }]; lastTypedFrom = 'translate'; return r; }
       return fillTyped(ch);
     },
-    listenComplete: ({ ch }) => fillTyped(ch),
+    listenComplete: async ({ ch }) => { await waitGuessReady(); return fillTyped(ch); }, // v0.19.17
     partialReverseTranslate: ({ ch }) => {
       const text = (ch.displayTokens || []).filter((t) => t.isBlank).map((t) => t.text).join('');
       const el = $(S.editable);
@@ -920,7 +969,7 @@
         emit('unknownType', { type: c.ch.type, keys: Object.keys(c.ch) });
         report(T('log.newType', { type: c.ch.type }), 'warn');
       }
-      lastTyped = [];
+      lastTyped = []; lastTypedFrom = '';
       await (fn || genericSolver)(c);
       if (lastTyped.length) await rescueTyped(); // v0.19.15: campo que voltou vazio
       return true;
@@ -1915,7 +1964,7 @@
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
     outageState: () => outage, waitOutage, sendFail, settled, rateShift, siteErrorPage, reloadBlocked, // v0.19.9 (testes)
-    fillInputs, challengeRoot, diagTyped, screenDiag, rescueTyped, typedRescue, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
+    fillInputs, challengeRoot, diagTyped, screenDiag, rescueTyped, typedRescue, repairGuess, waitGuessReady, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────

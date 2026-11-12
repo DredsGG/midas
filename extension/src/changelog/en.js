@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.17': [
+      "Typing completion exercises (\"Complete the translation\" and listen-and-complete): Midas waits for Duolingo to set up the answer before typing. Typing too early made Duolingo throw away every text in that exercise; if that already happened, Midas rebuilds the answer.",
+    ],
     '0.19.16': [
       "When a Legendary lesson is dropped on a typing exercise, the log also shows the short diagnostic of the exercise (as it already did in lessons with \"Skip\"), without the answer.",
     ],

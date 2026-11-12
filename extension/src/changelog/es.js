@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.17': [
+      "Ejercicios de completar escribiendo (\"Completa la traducción\" y el de escuchar y completar): Midas espera a que Duolingo prepare la respuesta antes de escribir. Escribir demasiado pronto hacía que Duolingo descartara todo el texto de ese ejercicio; si ya pasó, Midas reconstruye la respuesta.",
+    ],
     '0.19.16': [
       "Cuando una lección de Legendario se abandona en un ejercicio de escribir, el registro también muestra el diagnóstico corto del ejercicio (como ya lo hacía en las lecciones con \"Saltar\"), sin la respuesta.",
     ],

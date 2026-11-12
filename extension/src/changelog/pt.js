@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.17': [
+      "Exercícios de completar digitando (\"Complete a tradução\" e o de ouvir e completar): o Midas espera o Duolingo preparar a resposta antes de digitar. Digitar cedo demais fazia o Duolingo descartar todo texto daquele exercício; se isso já tiver acontecido, o Midas reconstrói a resposta.",
+    ],
     '0.19.16': [
       "Quando uma lição de Titãs é abandonada num exercício de digitar, o log também mostra o diagnóstico curto do exercício (como já mostrava nas lições com \"Pular\"), sem a resposta.",
     ],
