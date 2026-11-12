@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.16': [
+      "Cuando una lección de Legendario se abandona en un ejercicio de escribir, el registro también muestra el diagnóstico corto del ejercicio (como ya lo hacía en las lecciones con \"Saltar\"), sin la respuesta.",
+    ],
     '0.19.15': [
       "Ejercicios de completar la traducción escribiendo: cuando el campo no se queda con el texto, Midas prueba otras formas de escribir (incluida la forma en que el navegador escribe de verdad) antes de saltar el ejercicio, y el registro dice cuál funcionó.",
     ],

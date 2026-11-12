@@ -1033,6 +1033,8 @@
     'PARTIAL_XP_DUO_SLIDING', 'COACH_DUO_SLIDING', 'HARD_MODE_DUO_SLIDING',
   ]);
 
+  // exercícios de digitar: o diagnóstico curto (campos, resgate, eventos do campo) só faz sentido neles
+  const TYPED_RE = /reverseTranslation|typeCloze|typeComplete|listenComplete|translate|tableComplete|partialReverse/i;
   const runLesson = async (token, { timeoutMs = 8 * 60e3 } = {}) => {
     let t0 = Date.now();
     // o exercício respondido é identificado pelo próprio objeto do desafio: a troca
@@ -1125,6 +1127,7 @@
             }
             if (await pauseIfDown()) continue;
             report(T('log.stuckAbandon', { type: t }), 'error');
+            if (TYPED_RE.test(t || '')) report(diagTyped(), 'warn'); // v0.19.16: nas Titãs (sem Pular) o diagnóstico também sai
             return 'stuck';
           }
           if (cfg.delay > 0) await wait(cfg.delay * 0.6);
@@ -1160,6 +1163,7 @@
             // Titãs não tem "Pular": desiste da lição para o grind seguir em frente
             if (await pauseIfDown()) continue;
             report(T('log.stuckAbandon', { type: t }), 'error');
+            if (TYPED_RE.test(t || '')) report(diagTyped(), 'warn'); // v0.19.16: nas Titãs (sem Pular) o diagnóstico também sai
             emit('stuckType', { type: t });
             return 'stuck';
           }

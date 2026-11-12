@@ -3,6 +3,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.16': [
+      "When a Legendary lesson is dropped on a typing exercise, the log also shows the short diagnostic of the exercise (as it already did in lessons with \"Skip\"), without the answer.",
+    ],
     '0.19.15': [
       "Typing exercises that complete a translation: when the field does not keep the text, Midas tries other ways of typing (including the way the browser types for real) before skipping the exercise, and the log says which way worked.",
     ],

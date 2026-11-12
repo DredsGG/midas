@@ -4,6 +4,9 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.16': [
+      "Quando uma lição de Titãs é abandonada num exercício de digitar, o log também mostra o diagnóstico curto do exercício (como já mostrava nas lições com \"Pular\"), sem a resposta.",
+    ],
     '0.19.15': [
       "Exercícios de completar a tradução digitando: quando o campo não fica com o texto, o Midas tenta outros jeitos de digitar (inclusive como o navegador digita de verdade) antes de pular o exercício, e o log diz qual jeito funcionou.",
     ],
