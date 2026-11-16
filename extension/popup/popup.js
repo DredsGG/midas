@@ -42,7 +42,8 @@ const fmtDur = (ms) => {
 
 const render = (st) => {
   const running = st.alp_running;
-  $('running').textContent = T(running === 'grind' ? 'pop.running.grind' : running === 'lesson' ? 'pop.running.lesson' : 'chip.stopped');
+  $('running').textContent = T(running === 'grind' ? 'pop.running.grind' : running === 'lesson' ? 'pop.running.lesson' : 'chip.stopped') +
+    (running === 'grind' && st.alp_hidden ? ' · ' + T('hud.hidden') : ''); // v0.19.18: aba escondida
   const g = $('grind');
   const on = running === 'grind';
   g.textContent = T(on ? 'btn.stop' : 'btn.start');
@@ -114,7 +115,7 @@ const setDismissed = async (v, clearJust) => {
 };
 
 const refresh = async () => {
-  const st = await chrome.storage.local.get(['alp_running', 'alp_progress', 'alp_log', 'alp_unknown', 'alp_update']);
+  const st = await chrome.storage.local.get(['alp_running', 'alp_progress', 'alp_log', 'alp_unknown', 'alp_update', 'alp_hidden']);
   render(st);
   upd = st.alp_update || {};
   renderUpd();

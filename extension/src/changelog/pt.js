@@ -4,6 +4,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.pt = {
+    '0.19.18': [
+      "Com a aba do grind escondida, o Duolingo não carrega a lição. Agora o Midas espera a aba ficar visível e tenta de novo na hora, em vez de pular o nó e ficar até 30 min \"travado\". O painel e o popup avisam: \"A aba está escondida; o Duolingo não carrega a lição. Deixe a aba visível.\"",
+      "O nó em andamento é aberto pelo mesmo link que o próprio Duolingo usa.",
+    ],
     '0.19.17': [
       "Exercícios de completar digitando (\"Complete a tradução\" e o de ouvir e completar): o Midas espera o Duolingo preparar a resposta antes de digitar. Digitar cedo demais fazia o Duolingo descartar todo texto daquele exercício; se isso já tiver acontecido, o Midas reconstrói a resposta.",
     ],

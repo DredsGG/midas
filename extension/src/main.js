@@ -1442,15 +1442,22 @@
   // (/lesson/unit/U/level/N, conferido em 2026-10-25: credita o nó igual ao clique). Baú não tem
   // endereço: continua só pelo clique.
   const levelPath = (lv) => `/lesson/unit/${lv.unitIndex + 1}/level/${lv.levelInUnit + 1}`;
+  // v0.19.18: para o nó ATIVO o próprio Duolingo usa o link /lesson (função de URL do nó no bundle do site, 12/11:
+  // `case"active": return mode ? `/lesson?mode=${mode}` : "/lesson"`); /lesson/unit/U/level/N ele só usa para nó já feito
+  // ou em depuração. Nó já feito continua pelo endereço do nó.
   const startByRoute = async (lv) => {
     if (!lv || lv.type === 'chest') return false;
     report(T('log.routeStart'), 'warn');
-    lastTry.url = levelPath(lv);
-    await go(levelPath(lv));
+    const useLesson = lv.state === 'active' && !(routeLessonFailed[lv.id] > 0);
+    const url = useLesson ? '/lesson' : levelPath(lv);
+    if (useLesson) shownStart = { id: null, route: true };
+    lastTry.url = url;
+    await go(url);
     return true;
   };
   // v0.19.11: nó que a página mostrou como ativo e foi aberto no lugar do nó da API (ver startActiveNode)
   let shownStart = null;
+  const routeLessonFailed = {}; // v0.19.18: id do nó → vezes que /lesson não abriu a lição com a aba visível
   // v0.19.11: última tentativa do grind (para o diagnóstico do "travado"): nó, endereço, resultado, status
   const lastTry = { lv: null, mode: null, url: null, r: null, code: 0 };
   const startActiveNode = async (wantId = null, lvWanted = null) => {
@@ -1768,6 +1775,32 @@
     if (!token.stop && current === token) { emit('reloading', { fresh: true }); return true; }
     return false;
   };
+  // v0.19.18: aba escondida. O Duolingo não monta a lição numa aba em segundo plano (visto ao vivo em 13/11: 16 voltas
+  // seguidas numa história, "aba escondida · elementos: loading-screen, drawer-backdrop"; na aba visível abre normal).
+  // Pular o nó e entrar na espera de "travado" não adianta: espera a aba ficar visível e tenta o MESMO nó na hora. Não conta
+  // tentativa, pulo nem alp.blockedReloads; renova alp_step.waitUntil para a vigia de 15 min não chamar de "travado".
+  const hiddenNow = () => document.visibilityState === 'hidden';
+  let wakeHidden = null; // acorda a espera (Parar, pausa, outra aba, vigia)
+  const waitVisible = async (token, lv) => {
+    const since = Date.now();
+    report(T('log.hiddenWait', { u: lv ? lv.unitIndex + 1 : '?', n: lv ? lv.levelInUnit + 1 : '?', name: lv?.debugName || '' }), 'warn');
+    emit('hiddenWait', { since, u: lv ? lv.unitIndex + 1 : null, n: lv ? lv.levelInUnit + 1 : null });
+    let renewAt = 0;
+    while (!token.stop && hiddenNow()) {
+      if (Date.now() >= renewAt) { renewAt = Date.now() + 10 * 60e3; emit('waiting', { until: Date.now() + 30 * 60e3 }); }
+      await new Promise((res) => {
+        const done = () => { document.removeEventListener('visibilitychange', on); if (wakeHidden === done) wakeHidden = null; res(); };
+        const on = () => { if (!hiddenNow()) done(); };
+        wakeHidden = done;
+        document.addEventListener('visibilitychange', on);
+        sleep(30e3).then(done);
+      });
+    }
+    // a ponte apaga o aviso e, se a espera não foi interrompida, recomeça o relógio da vigia agora (senão os minutos
+    // escondidos contariam como "15 min sem avanço" e a vigia mandaria "travado" logo depois)
+    emit('hiddenWait', { done: true, reset: !token.stop });
+    if (!token.stop) report(T('log.hiddenBack', { m: Math.round((Date.now() - since) / 60e3) }));
+  };
   const fmtWhen = (at) => {
     const loc = window[Symbol.for('alp.i18n')]?.locale;
     try { return new Date(at || Date.now()).toLocaleString(loc, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return new Date(at || Date.now()).toISOString(); }
@@ -1940,9 +1973,18 @@
         try { localStorage.removeItem(BLOCK_KEY); } catch { /* sem storage */ }
         grindState.attempts[lv.id] = 0;
         delete grindState.sess5xx[lv.id];
-        if (mode === 'normal') justPassedId = otherMoved && opened ? opened.id : lv.id; // emenda a Titãs do mesmo nó
+        if (mode === 'normal') justPassedId = otherMoved && opened?.id ? opened.id : lv.id; // emenda a Titãs do mesmo nó
+      }
+      else if (hiddenNow() && r === 'no-session') {
+        // v0.19.18: aba escondida, a lição não montou: espera a aba voltar e tenta o mesmo nó (não pula, não é "travado")
+        await waitVisible(token, lv);
+        if (token.stop) break;
+        retry = { id: lv.id, mode };
+        if (sessionVisible() || !onLearnPage()) await go('/learn');
+        continue;
       }
       else {
+        if (opened?.route && r === 'no-session') routeLessonFailed[lv.id] = (routeLessonFailed[lv.id] || 0) + 1; // próxima: endereço do nó
         if (String(r).startsWith('session-error')) {
           grindState.attempts[lv.id] = 1; // força o pulo abaixo
           report(T('log.refused', { status: r.replace('session-error-', '') === '0' ? 'rede' : r.replace('session-error-', '') }), 'warn');
@@ -1964,7 +2006,7 @@
     fetchPath, api, userId, grind, grindState, startActiveNode, go, ensureSection, etaPer, rateSample, pace,
     unknownTypes: () => [...unknownTypes],
     outageState: () => outage, waitOutage, sendFail, settled, rateShift, siteErrorPage, reloadBlocked, // v0.19.9 (testes)
-    fillInputs, challengeRoot, diagTyped, screenDiag, rescueTyped, typedRescue, repairGuess, waitGuessReady, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
+    fillInputs, challengeRoot, diagTyped, screenDiag, waitVisible, rescueTyped, typedRescue, repairGuess, waitGuessReady, diffBlank, typedAnswers, fillTyped, // v0.19.6/0.19.7 (testes)
   };
 
   // ───────────────────────── comandos ─────────────────────────
@@ -1976,6 +2018,7 @@
   // manual = o usuário mandou parar (só isso desliga o grind de vez); fim por conta
   // própria (lição avulsa, grind completo) manda manual=false
   const stopAll = (manual = true) => {
+    try { wakeHidden?.(); } catch { /* ok */ }
     if (manual) keepOn = false;
     const was = current?.kind || null;
     if (current) current.stop = true;
@@ -2022,6 +2065,7 @@
     // Não passa pelo stopAll: o lock continua com esta aba durante a espera.
     stuck: async (d) => {
       if (current?.kind !== 'grind' || outageNow()) return; // v0.19.9: queda do Duolingo não é travamento
+      if (hiddenNow() && wakeHidden) return; // v0.19.18: esperando a aba escondida voltar: não é travamento
       report(T('log.restarted', { cause: T('cause.stuck', { m: d?.mins || 15 }), when: fmtWhen(d?.at) }), 'warn');
       current.stop = true;
       const token = (current = { stop: false, kind: 'grind' });

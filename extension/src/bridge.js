@@ -285,6 +285,7 @@
         let active = alp_grind.active;
         // v0.17.0: começou a rodar (Iniciar, atalho, popup) com versão urgente pendente → pausa na hora
         if (urgent && data.running) { send('pause'); }
+        if (data.running === 'grind' || data.running === null) chrome.storage.local.remove('alp_hidden').catch(() => {}); // v0.19.18: aviso velho não fica
         if (data.running === 'grind') {
           // v0.19.0: o grind (re)começou nesta aba: o relógio de "sem avanço" conta a partir de agora
           // (sem await: não pode atrasar o resto deste handler, que corre junto com a pausa da versão urgente)
@@ -303,6 +304,12 @@
         await chrome.storage.local.set({ alp_grind: { ...alp_grind, active: true, skip: data?.fresh ? {} : (alp_grind.skip || {}) } });
         if (flushT) { clearTimeout(flushT); await flush(); }
         location.reload();
+        break;
+      }
+      case 'hiddenWait': {
+        // v0.19.18: a aba do grind está escondida e o Duolingo não carrega a lição (o popup mostra o aviso)
+        if (data && !data.done) await chrome.storage.local.set({ alp_hidden: { since: Number(data.since) || Date.now(), u: data.u ?? null, n: data.n ?? null } });
+        else { await chrome.storage.local.remove('alp_hidden'); if (data?.reset) await resetStep(); }
         break;
       }
       case 'blockedDiag': {

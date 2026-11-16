@@ -3,6 +3,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.es = {
+    '0.19.18': [
+      "Con la pestaña del grind oculta, Duolingo no carga la lección. Ahora Midas espera a que la pestaña esté visible y vuelve a intentar al instante, en vez de saltar el nodo y quedarse hasta 30 min \"atascado\". El panel y el popup avisan: \"La pestaña está oculta; Duolingo no carga la lección. Deja la pestaña visible.\"",
+      "El nodo en curso se abre con el mismo enlace que usa el propio Duolingo.",
+    ],
     '0.19.17': [
       "Ejercicios de completar escribiendo (\"Completa la traducción\" y el de escuchar y completar): Midas espera a que Duolingo prepare la respuesta antes de escribir. Escribir demasiado pronto hacía que Duolingo descartara todo el texto de ese ejercicio; si ya pasó, Midas reconstruye la respuesta.",
     ],

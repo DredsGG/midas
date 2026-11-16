@@ -3,6 +3,10 @@
   const k = Symbol.for('alp.changelog');
   const all = w[k] || (w[k] = {});
   all.en = {
+    '0.19.18': [
+      "With the grind tab hidden, Duolingo does not load the lesson. Midas now waits for the tab to be visible and tries again right away, instead of skipping the node and sitting \"blocked\" for up to 30 min. The panel and popup say: \"The tab is hidden; Duolingo does not load the lesson. Keep the tab visible.\"",
+      "The node in progress is opened with the same link Duolingo itself uses.",
+    ],
     '0.19.17': [
       "Typing completion exercises (\"Complete the translation\" and listen-and-complete): Midas waits for Duolingo to set up the answer before typing. Typing too early made Duolingo throw away every text in that exercise; if that already happened, Midas rebuilds the answer.",
     ],

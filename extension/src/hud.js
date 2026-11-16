@@ -754,7 +754,7 @@
     }
     // v0.19.9: uma linha de status enquanto o Duolingo estiver fora do ar (ou sem internet)
     const ou = $('.outage');
-    ou.textContent = state.outage ? I18N.outText?.(state.outage) || '' : state.blocked ? T('hud.blocked', state.blocked) : '';
+    ou.textContent = state.outage ? I18N.outText?.(state.outage) || '' : state.hidden ? T('hud.hidden') : state.blocked ? T('hud.blocked', state.blocked) : '';
     ou.hidden = !ou.textContent;
     const cfg = API()?.cfg;
     if (cfg) {
@@ -879,6 +879,7 @@
         break;
       case 'outage': state.outage = data || null; break; // v0.19.9
       case 'blockedDiag': state.blocked = data || null; break; // v0.19.11: grind travado, com o porquê
+      case 'hiddenWait': state.hidden = data && !data.done ? data : null; break; // v0.19.18: aba escondida, esperando ela voltar
       case 'grindStep': if (data?.upgraded) state.blocked = null; else return; break;
       case 'config': break; // render relê API().cfg
       case 'theme': setTheme(data); return;

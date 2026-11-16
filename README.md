@@ -8,7 +8,7 @@
 A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and runs an **Auto Grind** that takes every node on your path to Legendary.
 
 ![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-4285F4?logo=googlechrome&logoColor=white)
-![Version](https://img.shields.io/badge/version-0.19.17-f5b301)
+![Version](https://img.shields.io/badge/version-0.19.18-f5b301)
 ![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 <img src="docs/hud-auto-grind.png" width="420" alt="Midas HUD inside Duolingo: Auto Grind progress with legendary, left and estimate counters, current lesson buttons, speed presets and the live log">
@@ -21,7 +21,7 @@ A Chrome extension (Manifest V3) that solves Duolingo lessons and stories and ru
 
 - **Auto Grind (“Gild everything”).** Reads your whole learning path, finishes the lessons you haven't done, then runs Legendary on every `skill`, `story` and `practice` node, from the first unit to the last (Spaced Repetition practices included: Midas fills in the skill list the Duolingo website leaves empty). It checks that each node really turned legendary and retries once. It stops on its own when nothing is left, or when you press **Stop**. It is built to run unattended:
   - if the tab reloads mid-run, it picks up where it stopped; it also reloads the page by itself every hour (between nodes) and whenever the path gets stuck;
-  - if the next lesson node doesn't show up on the page (it happens in background tabs), it opens the lesson by its direct address; if the page shows a different node as active (another tab moved the course on), it reloads once to get a fresh path;
+  - if the next lesson node doesn't show up on the page (it happens in background tabs), it opens the lesson with the same link Duolingo uses for the node in progress (`/lesson`); if Duolingo does not load the lesson because the tab is hidden, Midas waits for the tab to be visible and tries the same node again right away (no skipping, no "stuck" wait), and the panel and popup say "The tab is hidden; Duolingo does not load the lesson. Keep the tab visible."; if the page shows a different node as active (another tab moved the course on), it reloads once to get a fresh path;
   - a speaking exercise that can't be skipped makes it leave the lesson and reload; after 3 tries on the same node it moves on and comes back at the hourly restart;
   - a background watchdog reloads the tab right away if Chrome's Energy Saver freezes it, or after 4 minutes if the page hangs;
   - if Duolingo itself is down (server errors) or your internet drops, Midas does not treat it as a stuck grind: after two failures in a minute it checks the site with a light request that carries no cookie or account data, then waits and checks again at 1, 2, 5, 10, 20 and 30 minutes, without reloading in a loop, skipping nodes or dropping the lesson (it repeats the same exercise), and resumes when the site answers. After 6 hours it goes back to the normal behavior. The log and the HUD show it (*Duolingo is down (error 503): waiting 5 min*), and the time estimate ignores the outage;
